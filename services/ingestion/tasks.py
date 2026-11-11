@@ -1,0 +1,436 @@
+import logging
+from datetime import timedelta, datetime, timezone
+from typing import List, Any
+from decimal import Decimal
+from celery_app import celery_app
+from celery.exceptions import MaxRetriesExceededError
+from sqlalchemy import exc, text
+from shared.db.session import SessionLocal
+from shared.utils.timezone import now_utc
+from shared.db.mappers import split_crypto_pair
+from shared.db.repositories.market_repo import (
+    ensure_exchange,
+    ensure_symbol,
+    upsert_ohlcv_raw,
+    upsert_ohlcv,
+    log_job,
+    update_job,
+    record_dq_check,
+)
+from adapters.binance_adapter import BinanceAdapter
+from adapters.vietcap_adapter import VietcapAdapter
+
+# Safe imports for pipeline processing module
+try:
+    from app.pipeline import run_clean_and_store
+except ImportError:
+    from services.ingestion.app.pipeline import run_clean_and_store
+
+logger = logging.getLogger(__name__)
+
+
+@celery_app.task
+def ingest_crypto_task(symbols: List[str], resolution: str = "1h") -> int:
+    """
+    Celery task to fetch latest cryptocurrency prices from Binance and upsert to database.
+    """
+    logger.info(f"Starting crypto ingestion task for {symbols} ({resolution})")
+    adapter = BinanceAdapter()
+    db = SessionLocal()
+    count = 0
+
+    try:
+        # Determine since time (e.g. last 24 hours for hourly, last 30 days for daily)
+        since_delta = timedelta(days=1) if resolution == "1h" else timedelta(days=30)
+        since_time = now_utc() - since_delta
+        since_ms = int(since_time.timestamp() * 1000)
+
+        # Ensure exchange exists
+        exchange_id = ensure_exchange(
+            db, "BINANCE", "Binance Cryptocurrency Exchange", "crypto", "UTC"
+        )
+
+        # Make sure tickers exist in db
+        for symbol in symbols:
+            # Normalize symbol format for DB: remove slash (e.g. 'BTC/USDT' -> 'BTCUSDT')
+            ticker_str = symbol.replace("/", "")
+            base, quote = split_crypto_pair(ticker_str)
+            if not base or not quote:
+                if "/" in symbol:
+                    base, quote = symbol.split("/")
+                else:
+                    base, quote = symbol, "USDT"
+
+            symbol_id = ensure_symbol(
+                db, exchange_id, ticker_str, "crypto", "binance", base, quote
+            )
+
+            # Log job start
+            job_id = log_job(
+                db,
+                "ingest",
+                f"crypto_ingest_{ticker_str}",
+                "running",
+                symbol_id=symbol_id,
+                timeframe=resolution,
+            )
+            db.commit()
+
+            try:
+                candles = adapter.fetch_historical_ohlcv(
+                    symbol=symbol,  # CCXT adapter expects original symbol (e.g. 'BTC/USDT')
+                    timeframe=resolution,
+                    since_timestamp_ms=since_ms,
+                    limit=100,
+                )
+
+                if candles:
+                    rows = []
+                    for candle in candles:
+                        rows.append(
+                            {
+                                "symbol_id": symbol_id,
+                                "timeframe": resolution,
+                                "ts": candle.timestamp,
+                                "open": Decimal(str(candle.open)),
+                                "high": Decimal(str(candle.high)),
+                                "low": Decimal(str(candle.low)),
+                                "close": Decimal(str(candle.close)),
+                                "volume": Decimal(str(candle.volume)),
+                            }
+                        )
+
+                    # Map and validate
+                    raw_rows = [
+                        {**r, "source": "binance", "raw_payload": None} for r in rows
+                    ]
+                    clean_rows = []
+                    for r in rows:
+                        if (
+                            r["high"] >= r["low"]
+                            and r["open"] >= 0
+                            and r["close"] >= 0
+                            and r["volume"] >= 0
+                        ):
+                            clean_rows.append(r)
+
+                    upsert_ohlcv_raw(db, raw_rows)
+                    affected_clean = upsert_ohlcv(db, clean_rows)
+                    count += affected_clean
+
+                    # Record Data Quality Check
+                    filtered_out = len(rows) - len(clean_rows)
+                    record_dq_check(
+                        db=db,
+                        symbol_id=symbol_id,
+                        timeframe=resolution,
+                        check_name="high_low_check",
+                        passed=(filtered_out == 0),
+                        ts_start=min(r["ts"] for r in rows),
+                        ts_end=max(r["ts"] for r in rows),
+                        detail={"total_rows": len(rows), "filtered_rows": filtered_out},
+                    )
+
+                    update_job(db, job_id, "success", rows_affected=affected_clean)
+                else:
+                    # A 30-day window always holds sessions: empty means the
+                    # source was unreachable or changed its format.
+                    update_job(
+                        db,
+                        job_id,
+                        "failed",
+                        rows_affected=0,
+                        error_message="no data returned by Vietcap",
+                    )
+
+                db.commit()
+                logger.info(f"Upserted records for {symbol}")
+
+            except Exception as e:
+                logger.error(f"Failed to ingest crypto data for {symbol}: {str(e)}")
+                db.rollback()
+                update_job(db, job_id, "failed", error_message=str(e))
+                db.commit()
+
+    except Exception as e:
+        logger.error(f"Failed to setup crypto ingestion: {str(e)}")
+    finally:
+        adapter.close()
+        db.close()
+
+    return count
+
+
+@celery_app.task
+def ingest_stocks_task(symbols: List[str], resolution: str = "1d") -> int:
+    """
+    Celery task to fetch latest Vietnamese stock prices from Vietcap and upsert to database.
+
+    Vietcap prices are adjusted for dividends/splits. When the overlap with the
+    stored series shows a new adjustment, the whole history of that symbol is
+    refetched so the series has no artificial jump.
+    """
+    logger.info(f"Starting stock ingestion task for {symbols} ({resolution})")
+    adapter = VietcapAdapter()
+    db = SessionLocal()
+    count = 0
+
+    try:
+        # 30 days covers weekends, holidays and a stack that was down for a while
+        end_date = now_utc().date()
+        start_date = end_date - timedelta(days=30)
+
+        # Ensure exchange exists
+        exchange_id = ensure_exchange(
+            db, "HOSE", "Sở Giao dịch Chứng khoán TP.HCM", "stock", "Asia/Ho_Chi_Minh"
+        )
+
+        # Make sure tickers exist in db
+        for symbol in symbols:
+            symbol_id = ensure_symbol(db, exchange_id, symbol, "stock", "vnstock")
+
+            # Log job start
+            job_id = log_job(
+                db,
+                "ingest",
+                f"stock_ingest_{symbol}",
+                "running",
+                symbol_id=symbol_id,
+                timeframe=resolution,
+            )
+            db.commit()
+
+            try:
+                # Reach back to the last stored bar so the window always
+                # overlaps the stored series (needed to detect re-adjustment).
+                last_ts = db.execute(
+                    text(
+                        "SELECT max(ts) FROM market.ohlcv "
+                        "WHERE symbol_id = :sid AND timeframe = :tf"
+                    ),
+                    {"sid": symbol_id, "tf": resolution},
+                ).scalar()
+                window_start = (
+                    min(start_date, last_ts.date()) if last_ts else start_date
+                )
+                candles = adapter.fetch_historical_ohlcv(
+                    symbol=symbol,
+                    start_date=window_start,
+                    end_date=end_date,
+                    resolution=resolution,
+                )
+                history_start = _readjust_start(db, symbol_id, resolution, candles)
+                if history_start is not None:
+                    logger.info(
+                        f"{symbol}: price adjustment changed, refetching history"
+                    )
+                    candles = adapter.fetch_historical_ohlcv(
+                        symbol=symbol,
+                        start_date=history_start,
+                        end_date=end_date,
+                        resolution=resolution,
+                    )
+
+                if candles:
+                    rows = []
+                    for candle in candles:
+                        rows.append(
+                            {
+                                "symbol_id": symbol_id,
+                                "timeframe": resolution,
+                                "ts": candle.timestamp,
+                                "open": Decimal(str(candle.open)),
+                                "high": Decimal(str(candle.high)),
+                                "low": Decimal(str(candle.low)),
+                                "close": Decimal(str(candle.close)),
+                                "volume": Decimal(str(candle.volume)),
+                            }
+                        )
+
+                    # Map and validate
+                    # Source stays 'vnstock' (enum market.data_source): Vietcap is
+                    # the upstream vnstock's VCI source used; no schema change.
+                    raw_rows = [
+                        {**r, "source": "vnstock", "raw_payload": None} for r in rows
+                    ]
+                    clean_rows = []
+                    for r in rows:
+                        if (
+                            r["high"] >= r["low"]
+                            and r["open"] >= 0
+                            and r["close"] >= 0
+                            and r["volume"] >= 0
+                        ):
+                            clean_rows.append(r)
+
+                    upsert_ohlcv_raw(db, raw_rows)
+                    affected_clean = upsert_ohlcv(db, clean_rows)
+                    count += affected_clean
+
+                    # Record Data Quality Check
+                    filtered_out = len(rows) - len(clean_rows)
+                    record_dq_check(
+                        db=db,
+                        symbol_id=symbol_id,
+                        timeframe=resolution,
+                        check_name="high_low_check",
+                        passed=(filtered_out == 0),
+                        ts_start=min(r["ts"] for r in rows),
+                        ts_end=max(r["ts"] for r in rows),
+                        detail={"total_rows": len(rows), "filtered_rows": filtered_out},
+                    )
+
+                    update_job(db, job_id, "success", rows_affected=affected_clean)
+                else:
+                    # A 30-day window always holds sessions: empty means the
+                    # source was unreachable or changed its format.
+                    update_job(
+                        db,
+                        job_id,
+                        "failed",
+                        rows_affected=0,
+                        error_message="no data returned by Vietcap",
+                    )
+
+                db.commit()
+                logger.info(f"Upserted records for {symbol}")
+
+            except Exception as e:
+                logger.error(f"Failed to ingest stock data for {symbol}: {str(e)}")
+                db.rollback()
+                update_job(db, job_id, "failed", error_message=str(e))
+                db.commit()
+
+    except Exception as e:
+        logger.error(f"Failed to setup stock ingestion: {str(e)}")
+    finally:
+        adapter.close()
+        db.close()
+
+    return count
+
+
+ADJUSTMENT_TOLERANCE = 0.005  # 0.5 % difference on a stored day = a new adjustment
+
+
+def _readjust_start(db, symbol_id: int, timeframe: str, candles: list) -> Any:
+    """Return the first stored day if the fetched prices are re-adjusted, else None.
+
+    Compares the oldest fetched candle with the stored close of the same day.
+    """
+    if not candles:
+        return None
+    row = db.execute(
+        text(
+            "SELECT close, (SELECT min(ts) FROM market.ohlcv "
+            "WHERE symbol_id = :sid AND timeframe = :tf) "
+            "FROM market.ohlcv WHERE symbol_id = :sid AND timeframe = :tf AND ts = :ts"
+        ),
+        {"sid": symbol_id, "tf": timeframe, "ts": candles[0].timestamp},
+    ).fetchone()
+    if row is None or not row[0]:
+        return None
+    stored_close, first_ts = float(row[0]), row[1]
+    if abs(candles[0].close / stored_close - 1) <= ADJUSTMENT_TOLERANCE:
+        return None
+    return first_ts.date()
+
+
+@celery_app.task(bind=True, max_retries=3)
+def clean_and_store_task(self, symbol_id: int, timeframe: str) -> dict[str, Any]:
+    """
+    Celery task to run the cleaning pipeline and store clean data.
+    Logs the job status in ops.job_log, updates it to success or failed, and
+    performs retries with exponential backoff on database transient connection issues.
+    """
+    db = SessionLocal()
+    celery_task_id = self.request.id
+
+    # 1. Log job start
+    job_id = log_job(
+        db,
+        job_type="clean",
+        job_name=f"clean_and_store_{symbol_id}_{timeframe}",
+        status="running",
+        symbol_id=symbol_id,
+        timeframe=timeframe,
+    )
+
+    # Assocate the celery task id
+    if celery_task_id:
+        try:
+            db.execute(
+                text("UPDATE ops.job_log SET celery_task_id = :task_id WHERE id = :id"),
+                {"task_id": celery_task_id, "id": job_id},
+            )
+            db.commit()
+        except Exception as e:
+            logger.warning(f"Could not update celery_task_id in ops.job_log: {e}")
+            db.rollback()
+
+    start_time = datetime.now(timezone.utc)
+
+    try:
+        # 2. Run pipeline
+        report = run_clean_and_store(db, symbol_id, timeframe)
+
+        # 3. Success logging
+        duration_ms = int(
+            (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+        )
+        rows_affected = report.get("output_rows", 0)
+
+        update_job(
+            db,
+            job_id,
+            status="success",
+            rows_affected=rows_affected,
+            duration_ms=duration_ms,
+        )
+        db.commit()
+        return report
+
+    except exc.OperationalError as e:
+        db.rollback()
+        duration_ms = int(
+            (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+        )
+        logger.warning(
+            f"Database operational error in clean_and_store_task "
+            f"(retry {self.request.retries}/3): {e}"
+        )
+
+        try:
+            # Exponential backoff countdown: 5s, 10s, 20s
+            countdown = 5 * (2**self.request.retries)
+            raise self.retry(exc=e, countdown=countdown)
+        except MaxRetriesExceededError as retry_err:
+            update_job(
+                db,
+                job_id,
+                status="failed",
+                duration_ms=duration_ms,
+                error_message=f"Max retries exceeded: {str(e)}",
+            )
+            db.commit()
+            raise retry_err
+
+    except Exception as e:
+        db.rollback()
+        duration_ms = int(
+            (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+        )
+        logger.error(f"Logic or data validation error in clean_and_store_task: {e}")
+
+        update_job(
+            db,
+            job_id,
+            status="failed",
+            duration_ms=duration_ms,
+            error_message=str(e),
+        )
+        db.commit()
+        raise e
+
+    finally:
+        db.close()

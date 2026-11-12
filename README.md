@@ -6,14 +6,33 @@ Hệ thống tự động thu thập dữ liệu giá từ **thị trường ch�
 
 ## Thành Viên Nhóm
 
-| STT | Họ và Tên | Mã Sinh Viên | Lớp |
-|:---:|-----------|:------------:|:----:|
-| 1 | **Đỗ Quang Hà** *(Chủ nhiệm đề tài)* | 23810310132 | D18CNPM2 |
-| 2 | Nguyễn Văn Kiên | 23810310138 | D18CNPM2 |
-| 3 | Khiếu Đình Trung Nguyên | 24810310401 | D19CNPM4 |
-| 4 | Nguyễn Trọng Đại | 23810310120 | D18CNPM2 |
-| 5 | Lê Hải Nam | 23810310377 | D18CNPM5 |
-| 6 | Nguyễn Trọng Hiếu | 24810340513 | D19CNPM1 |
+Bài tập lớn môn **Phân tích và Trực quan hóa dữ liệu**.
+
+| STT | Họ và Tên | Mã Sinh Viên |
+|:---:|-----------|:------------:|
+| 1 | **Lê Hải Nam** *(Nhóm trưởng)* | 23810310377 |
+| 2 | Nguyễn Thùy Linh | 23810310378 |
+
+## Nguồn Gốc Dự Án
+
+Dự án được phát triển tiếp từ đồ án nghiên cứu khoa học
+[Ennela/NCKH-CryptographicAnalysis](https://github.com/Ennela/NCKH-CryptographicAnalysis)
+(benchmark bốn mô hình ARIMA, XGBoost, Random Forest, GRU) của nhóm:
+
+| Họ và Tên | Mã Sinh Viên | Lớp |
+|-----------|:------------:|:----:|
+| Đỗ Quang Hà *(Chủ nhiệm đề tài)* | 23810310132 | D18CNPM2 |
+| Nguyễn Văn Kiên | 23810310138 | D18CNPM2 |
+| Khiếu Đình Trung Nguyên | 24810310401 | D19CNPM4 |
+| Nguyễn Trọng Đại | 23810310120 | D18CNPM2 |
+| Lê Hải Nam | 23810310377 | D18CNPM5 |
+| Nguyễn Trọng Hiếu | 24810340513 | D19CNPM1 |
+
+Hạ tầng thu thập dữ liệu, pipeline làm sạch, ARIMA, XGBoost và phần lớn giao
+diện kế thừa từ đồ án gốc. Phạm vi của bài này: thu gọn còn ARIMA, XGBoost và
+baseline Naive; bổ sung phân tích khám phá và trực quan hóa dữ liệu. Số liệu
+benchmark trong [`docs/experiment_report.md`](docs/experiment_report.md) trích
+từ đồ án gốc.
 
 ---
 
@@ -159,8 +178,8 @@ NCKH/
 ### 1. Clone repository
 
 ```bash
-git clone https://github.com/Ennela/NCKH-CryptographicAnalysis.git
-cd NCKH-CryptographicAnalysis
+git clone https://github.com/lehainam-05/CryptographicAnalysis.git
+cd CryptographicAnalysis
 ```
 
 ### 2. Thiết lập biến môi trường
@@ -312,8 +331,7 @@ Feature Engineering sử dụng bộ feature riêng theo từng model; XGBoost h
 
 ## Quy Tắc Git & Bảo Mật
 
-- **Không commit trực tiếp** vào `main` hoặc `develop`. Tạo branch: `feature/<tên-tính-năng>`
-- **Conventional Commits**: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`
-- **Pull Request** cần ≥ 1 thành viên review & duyệt trước khi merge
+- Mỗi đầu việc nhỏ là một commit, push lên `main` ngay khi xong và CI xanh
+- **Conventional Commits** (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`), nội dung viết tiếng Việt
 - **Không commit** `.env`, API key, secret, hoặc dataset lớn vào repo
 

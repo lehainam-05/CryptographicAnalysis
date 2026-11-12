@@ -39,9 +39,8 @@ celery-worker + celery-beat ─▶ thu thập/làm sạch dữ liệu theo lịc
 ## 3. Dựng hệ thống
 
 ```bash
-git clone https://github.com/Ennela/NCKH-CryptographicAnalysis.git
-cd NCKH-CryptographicAnalysis
-git checkout develop
+git clone https://github.com/lehainam-05/CryptographicAnalysis.git
+cd CryptographicAnalysis
 ```
 
 Tạo file `.env` ở thư mục gốc (không commit). Mật khẩu và khóa nên sinh ngẫu

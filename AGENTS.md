@@ -7,7 +7,11 @@
 
 ## 0. Bối cảnh dự án (đọc để có ngữ cảnh)
 - Hệ thống thu thập, phân tích & DỰ BÁO giá cổ phiếu VN (vnstock) và crypto (Binance).
-- Đồ án nghiên cứu khoa học, 6 tháng, nhóm 5 người, theo Agile + Machine Learning.
+- Bài tập lớn môn **Phân tích và Trực quan hóa dữ liệu**, nhóm 2 người, phát triển tiếp từ đồ án
+  NCKH [Ennela/NCKH-CryptographicAnalysis](https://github.com/Ennela/NCKH-CryptographicAnalysis)
+  (xem README mục "Nguồn Gốc Dự Án").
+- Trọng tâm: thu thập, làm sạch, phân tích khám phá (EDA) và trực quan hóa dữ liệu; phần dự báo
+  chỉ giữ ARIMA + XGBoost, so với baseline Naive.
 - Đây là dự án HỌC THUẬT: ưu tiên code DỄ HIỂU, GIẢI THÍCH ĐƯỢC, TÁI LẬP ĐƯỢC hơn là "code cho nhanh".
 
 ---
@@ -35,46 +39,23 @@
 
 ## 3. Stack công nghệ (CHỐT — không tự đổi)
 - Backend: Python 3.11 + FastAPI (đa service: ingestion / training / inference).
-- Deep learning: **CHỈ DÙNG PyTorch.** KHÔNG trộn TensorFlow/Keras vào repo.
+- Mô hình chỉ gồm ARIMA + XGBoost; không dùng deep learning (GRU, Random Forest, PyTorch đã loại).
 - ML cổ điển: scikit-learn, statsmodels (ARIMA), XGBoost (baseline mạnh + SHAP).
 - Tuning: Optuna. Theo dõi thí nghiệm: MLflow.
 - DB: PostgreSQL + TimescaleDB (OHLCV là hypertable). ORM: SQLAlchemy 2.x + Alembic.
 - Queue: Celery + Redis. Frontend: Next.js (TypeScript) + ECharts.
 - Config: pydantic-settings đọc từ `.env`. DevOps: Docker + Docker Compose + GitHub Actions + Sentry.
 
-> Lý do khóa 1 framework DL: thống nhất kỹ năng, dễ review, tránh trộn môi trường,
-> và tránh copy code từ repo tham khảo (vốn dùng Keras).
-
 ---
 
 ## 4. Ai sở hữu phần nào (sửa đúng đất của mình)
 
-**Modeling (D18) — mỗi người trọn gói 1 model: feature engineering + model + entrypoint train riêng + test riêng**
+- **Lê Hải Nam** (23810310377, nhóm trưởng) — dữ liệu & trực quan hóa: services/ingestion/,
+  shared/, frontend/ (trang Phân tích, Pipeline và biểu đồ EDA mới), infra/, .github/workflows/.
+- **Nguyễn Thùy Linh** (23810310378) — mô hình & báo cáo: services/training/ (ARIMA, XGBoost),
+  services/inference/, trang Dự báo/Giải thích của frontend, docs/ và báo cáo, slide.
 
-- Nguyễn Văn Kiên — XGBoost: services/training/models/xgboost_model.py,
-  services/training/models/xgboost_features.py, services/training/train_xgboost.py,
-  services/training/tests/test_xgboost.py
-- Lê Hải Nam — Random Forest: services/training/models/random_forest_model.py,
-  services/training/models/random_forest_features.py, services/training/train_random_forest.py,
-  services/training/tests/test_random_forest.py
-- Nguyễn Trọng Đại — GRU: services/training/models/gru_model.py (tách khỏi nn_models.py cũ,
-  vốn gộp chung LSTM đã bị loại khỏi phạm vi đề tài), services/training/train_gru.py,
-  services/training/tests/test_gru.py
-- Đỗ Quang Hà — ARIMA: services/training/models/arima_model.py, services/training/train_arima.py,
-  services/training/tests/test_arima.py
-
-**Frontend (D19)**
-
-- Khiếu Đình Trung Nguyên, Nguyễn Trọng Hiếu — frontend/
-
-**Dùng chung — cả nhóm cùng sở hữu, PR sửa phần này cần tag toàn bộ nhóm review (không chỉ 1 người):**
-
-- services/ingestion/, infra/, .github/workflows/ (hạ tầng/CI)
-- services/inference/ (API phục vụ model đã chọn)
-- shared/ (dataset loader, db, utils)
-- docs/, tests/ gốc
-
-Sửa code ngoài phần mình sở hữu → phải mở PR và tag đúng người sở hữu review.
+Sửa code ngoài phần mình sở hữu → báo người sở hữu để cùng xem lại.
 
 ---
 
@@ -89,31 +70,31 @@ Sửa code ngoài phần mình sở hữu → phải mở PR và tag đúng ngư
 ## 6. Quy tắc dành riêng cho phần ML (rất quan trọng cho điểm)
 - **Không rò rỉ dữ liệu (no look-ahead):** chia dữ liệu theo THỜI GIAN, không xáo trộn.
 - **Scaler/encoder chỉ fit trên tập train**, sau đó transform valid/test.
-- **Cố định random seed** (numpy, torch, random) ở đầu mọi script train để tái lập.
+- **Cố định random seed** (numpy, random) ở đầu mọi script train để tái lập.
 - **Mọi thí nghiệm phải log vào MLflow**: params, metrics (MAE/RMSE/MAPE), artifact model.
 - Mọi mô hình mới phải so với **baseline Naive** — không có baseline thì kết quả vô nghĩa.
 - Lưu kết quả ra bảng/CSV để đưa vào báo cáo; không để kết quả "bay" trong notebook.
 
 ## 7. Chống đạo văn (học thuật)
 - ĐƯỢC tham khảo Ý TƯỞNG & PHƯƠNG PHÁP từ repo ML for Trading và nguồn ngoài.
-- KHÔNG copy code nguyên khối. Phải đọc hiểu → tự viết lại bằng PyTorch + dữ liệu của nhóm.
+- KHÔNG copy code nguyên khối. Phải đọc hiểu → tự viết lại bằng dữ liệu của nhóm.
 - Mọi ý tưởng/đoạn tham khảo phải GHI NGUỒN trong `docs/` và trong báo cáo (Chương 2 + Tham khảo).
 - Code do AI sinh cũng phải được người hiểu và chịu trách nhiệm — không "đổ cho AI".
 
 ---
 
 ## 8. Quy tắc Git
-- Nhánh: `main` (ổn định) ← `develop` (tích hợp) ← `feature/<ten-task>`.
-- KHÔNG push thẳng vào `main` hoặc `develop`. Mọi thay đổi qua Pull Request.
-- PR phải được **≥ 1 thành viên khác review & duyệt** mới merge.
-- Commit theo Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`.
-- PR nhỏ, tập trung 1 task; mô tả PR nêu rõ: làm gì, vì sao, đã test thế nào.
+- Repo: github.com/lehainam-05/CryptographicAnalysis, nhánh `main`.
+- Chia việc thành đầu việc nhỏ; mỗi đầu việc xong → test + lint → 1 commit → push lên `main`.
+- Commit theo Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`),
+  nội dung viết tiếng Việt: làm gì, vì sao, đã test thế nào.
+- CI (Lint & Format Check dùng `ruff==0.15.16`) phải xanh; đỏ thì sửa ngay ở commit kế tiếp.
 
 ## 9. Definition of Done (1 task chỉ "xong" khi đủ 4)
-- [ ] Code chạy được, đã merge vào `develop`.
+- [ ] Code chạy được, đã push lên `main` và CI xanh.
 - [ ] Có test cơ bản (hoặc đã kiểm thử thủ công có ghi lại).
 - [ ] Đã cập nhật tài liệu / `docs` nếu thay đổi hành vi hệ thống.
-- [ ] Demo được trong sprint review.
+- [ ] Demo được trên máy local.
 
 ## 10. Bảo mật
 - API key/secret chỉ đặt trong `.env` (đã có trong `.gitignore`). `.env.example` chỉ chứa tên biến.
@@ -125,7 +106,7 @@ Sửa code ngoài phần mình sở hữu → phải mở PR và tag đúng ngư
 ## 11. Mẫu prompt CHUẨN khi nhờ agent (copy & điền vào)
   Ngữ cảnh: [task này thuộc service nào, liên quan file nào]
   Yêu cầu: [mô tả 1 việc cụ thể, nhỏ]
-  Ràng buộc: tuân thủ RULES.md (PyTorch, không look-ahead, có type hint, log MLflow...)
+  Ràng buộc: tuân thủ AGENTS.md (không look-ahead, có type hint, log MLflow...)
   Trước khi code: đọc [các file liên quan] và trình bày kế hoạch ngắn, chờ tôi duyệt.
   Sau khi code: liệt kê file đã sửa + cách test.
 
@@ -171,4 +152,4 @@ Sửa code ngoài phần mình sở hữu → phải mở PR và tag đúng ngư
 - **Trạng thái:** Đã hoàn tất (2026-07-26) — `api/*` đã xóa, `services/ingestion`
   là collector duy nhất.
 - **Lý do (lịch sử):** Code thu thập dữ liệu (collector) từng nằm rải rác tại các thư mục `api/binance_fastapi` và `api/vnstock_fastapi`. Toàn bộ logic thu thập đã được gom vào `services/ingestion` làm dịch vụ cào dữ liệu tập trung duy nhất để đơn giản hóa vận hành và cấu trúc repo.
-- **Người chịu trách nhiệm:** TV1 (Data/Lead) + TV3 (Feature/Inference).
+- **Người chịu trách nhiệm:** TV1 (Data/Lead) + TV3 (Feature/Inference).

@@ -10,6 +10,17 @@ body {
   color: #f8fafc;
   font-family: "Inter", Arial, sans-serif;
   overflow-x: hidden;
+  caret-color: #3b82f6;
+}
+
+/* Browser surfaces themed from the palette (DESIGN.md). */
+::selection {
+  background: rgba(59, 130, 246, 0.35);
+  color: #f8fafc;
+}
+:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
 
 @layer components {
@@ -44,7 +55,7 @@ body {
     @apply border-b border-line bg-inset px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-400;
   }
   .data-table td {
-    @apply border-b border-line/40 px-4 py-2.5 text-slate-300;
+    @apply border-b border-line/40 px-4 py-2.5 text-slate-300 tabular-nums;
   }
   .data-table tbody tr {
     @apply transition-colors hover:bg-inset;
@@ -52,7 +63,7 @@ body {
 
   /* header a::after in the mockup: blue underline grows on hover / active */
   .nav-link {
-    @apply relative whitespace-nowrap px-3 py-5 text-[15px] text-muted transition-colors duration-300 hover:text-white;
+    @apply relative whitespace-nowrap px-2 py-4 text-sm text-muted sm:px-3 sm:py-5 sm:text-[15px] transition-colors duration-300 hover:text-white;
   }
   .nav-link::after {
     content: "";

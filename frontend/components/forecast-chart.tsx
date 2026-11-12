@@ -1,6 +1,7 @@
 "use client";
 
 import EChart, { CHART_THEME } from "@/components/echart";
+import palette from "@/lib/palette";
 
 export interface PricePoint {
   label: string;
@@ -41,7 +42,7 @@ export default function ForecastChart({ history, forecast }: { history: PricePoi
     },
     dataZoom: [
       { type: "inside", start: 55, end: 100 },
-      { type: "slider", start: 55, end: 100, bottom: 16, height: 22, textStyle: { color: "#94A3B8" }, borderColor: "#475569" },
+      { type: "slider", start: 55, end: 100, bottom: 16, height: 22, textStyle: { color: palette.inkMuted }, borderColor: "#475569" },
     ],
     series: [
       {
@@ -49,8 +50,8 @@ export default function ForecastChart({ history, forecast }: { history: PricePoi
         type: "line",
         data: actual,
         showSymbol: false,
-        lineStyle: { color: "#3B82F6", width: 2 },
-        itemStyle: { color: "#3B82F6" },
+        lineStyle: { color: palette.stock, width: 2 },
+        itemStyle: { color: palette.stock },
         areaStyle: { color: "rgba(59,130,246,0.08)" },
       },
       {
@@ -60,8 +61,8 @@ export default function ForecastChart({ history, forecast }: { history: PricePoi
         showSymbol: true,
         symbolSize: 6,
         connectNulls: false,
-        lineStyle: { color: "#F59E0B", width: 2.5, type: "dashed" },
-        itemStyle: { color: "#F59E0B" },
+        lineStyle: { color: palette.forecast, width: 2.5, type: "dashed" },
+        itemStyle: { color: palette.forecast },
       },
     ],
   };

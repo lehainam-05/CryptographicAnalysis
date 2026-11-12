@@ -5,11 +5,12 @@ import { describeApiError, fetchEda, type EdaResponse, type ReturnDistribution }
 import { formatNum } from "@/lib/format";
 import EChart, { CHART_THEME } from "@/components/echart";
 import { AssetBadge, Field, MetricRow, PageHeader, Panel, StateBox } from "@/components/ui";
+import palette from "@/lib/palette";
 
 // Categorical identity per market, validated for CVD on the dark panel (#1E293B).
-const MARKET_COLOR: Record<string, string> = { stock: "#3B82F6", crypto: "#D97706" };
+const MARKET_COLOR: Record<string, string> = { stock: palette.stock, crypto: palette.crypto };
 const MARKET_LABEL: Record<string, string> = { stock: "Cổ phiếu VN", crypto: "Crypto" };
-const NEUTRAL = "#94A3B8";
+const NEUTRAL = palette.inkMuted;
 // Diverging (correlation) and sequential (coverage) scales: one hue per side, gray midpoint.
 const DIVERGING = ["#2563EB", "#334155", "#E11D48"];
 const SEQUENTIAL = ["#172033", "#1E3A8A", "#60A5FA"];

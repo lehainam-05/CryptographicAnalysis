@@ -1,7 +1,8 @@
 /** @type {import('tailwindcss').Config} */
-// Palette taken from the team's HTML/CSS mockup (branch `frontend-hieu`,
-// "HTML & CSS demo/index.css"): slate page, slate-800 panels, slate-600
-// borders, blue accent, amber dashed forecast line.
+// Colour tokens live in lib/palette.js (documented in DESIGN.md) so Tailwind
+// classes and ECharts options can never drift apart.
+const palette = require("./lib/palette");
+
 module.exports = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
@@ -10,20 +11,23 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        page: "#0F172A",
-        panel: "#1E293B",
-        inset: "#172033",
-        line: "#475569",
-        muted: "#C3C2C2",
-        accent: "#2563EB",
-        accentHover: "#1E40AF",
-        accentSoft: "#3B82F6",
-        forecast: "#F59E0B",
-        up: "#10B981",
-        down: "#F43F5E",
+        page: palette.page,
+        panel: palette.panel,
+        inset: palette.inset,
+        line: palette.line,
+        muted: palette.inkSecondary,
+        accent: palette.accent,
+        accentHover: palette.accentHover,
+        accentSoft: palette.accentSoft,
+        stock: palette.stock,
+        crypto: palette.crypto,
+        forecast: palette.forecast,
+        up: palette.up,
+        down: palette.down,
       },
       fontFamily: {
         sans: ["Inter", "Arial", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
       },
     },
   },

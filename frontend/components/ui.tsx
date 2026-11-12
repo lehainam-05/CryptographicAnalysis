@@ -138,6 +138,16 @@ export function MetricRow({ label, value, note }: { label: string; value: ReactN
   );
 }
 
+/** One-line plain-Vietnamese reading printed under a chart (DESIGN.md: a note under every chart). */
+export function ChartReading({ children }: { children: ReactNode }) {
+  return <p className="mt-3 border-t border-line pt-3 text-sm leading-relaxed text-slate-300">{children}</p>;
+}
+
+/** A measured value inside prose: monospace, full ink. */
+export function Num({ children }: { children: ReactNode }) {
+  return <span className="font-mono text-white">{children}</span>;
+}
+
 /** Asset class pill. */
 export function AssetBadge({ assetClass }: { assetClass: string }) {
   return assetClass === "crypto" ? <Badge tone="crypto">Crypto</Badge> : <Badge tone="stock">Cổ phiếu VN</Badge>;

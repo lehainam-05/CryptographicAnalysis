@@ -184,7 +184,7 @@ Tất cả dịch vụ sẽ được build và khởi tạo tự động:
 
 | Dịch vụ | URL | Mô tả |
 |---------|-----|-------|
-| **Frontend** (Next.js) | [http://localhost:3000](http://localhost:3000) | Giao diện web chính |
+| **Frontend** (Next.js) | [http://localhost:3001](http://localhost:3001) | Giao diện web chính |
 | **Inference API** (FastAPI) | [http://localhost:8000](http://localhost:8000) | API dự báo & quản lý mô hình |
 | **Ingestion API** | [http://localhost:8001](http://localhost:8001) | Health check dịch vụ thu thập |
 | **MLflow Tracking** | [http://localhost:5000](http://localhost:5000) | UI quản lý thí nghiệm ML |
@@ -238,7 +238,7 @@ npm install
 npm run dev
 ```
 
-Frontend sẽ chạy tại [http://localhost:3000](http://localhost:3000).
+Frontend sẽ chạy tại [http://localhost:3100](http://localhost:3100).
 
 ### Chạy Backend riêng (không qua Docker)
 

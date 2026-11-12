@@ -37,7 +37,7 @@ npm install
 ```bash
 npm run dev
 ```
-Giao diện sẽ khởi chạy tại [http://localhost:3000](http://localhost:3000).
+Giao diện sẽ khởi chạy tại [http://localhost:3100](http://localhost:3100).
 
 ### 4. Build dự án sản xuất (Production Build)
 ```bash

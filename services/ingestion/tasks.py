@@ -40,11 +40,6 @@ def ingest_crypto_task(symbols: List[str], resolution: str = "1h") -> int:
     count = 0
 
     try:
-        # Determine since time (e.g. last 24 hours for hourly, last 30 days for daily)
-        since_delta = timedelta(days=1) if resolution == "1h" else timedelta(days=30)
-        since_time = now_utc() - since_delta
-        since_ms = int(since_time.timestamp() * 1000)
-
         # Ensure exchange exists
         exchange_id = ensure_exchange(
             db, "BINANCE", "Binance Cryptocurrency Exchange", "crypto", "UTC"
@@ -77,12 +72,9 @@ def ingest_crypto_task(symbols: List[str], resolution: str = "1h") -> int:
             db.commit()
 
             try:
-                candles = adapter.fetch_historical_ohlcv(
-                    symbol=symbol,  # CCXT adapter expects original symbol (e.g. 'BTC/USDT')
-                    timeframe=resolution,
-                    since_timestamp_ms=since_ms,
-                    limit=100,
-                )
+                since_ms = _crypto_since_ms(db, symbol_id, resolution)
+                # CCXT adapter expects the original symbol (e.g. 'BTC/USDT')
+                candles = _fetch_crypto_since(adapter, symbol, resolution, since_ms)
 
                 if candles:
                     rows = []
@@ -140,7 +132,7 @@ def ingest_crypto_task(symbols: List[str], resolution: str = "1h") -> int:
                         job_id,
                         "failed",
                         rows_affected=0,
-                        error_message="no data returned by Vietcap",
+                        error_message="no data returned by Binance",
                     )
 
                 db.commit()
@@ -311,6 +303,48 @@ def ingest_stocks_task(symbols: List[str], resolution: str = "1d") -> int:
 
 
 ADJUSTMENT_TOLERANCE = 0.005  # 0.5 % difference on a stored day = a new adjustment
+
+
+# Window refetched on every run even when the stack never stopped.
+CRYPTO_RECENT_WINDOW = {"1h": timedelta(days=1), "1d": timedelta(days=30)}
+BINANCE_PAGE_LIMIT = 1000
+
+
+def _crypto_since_ms(db, symbol_id: int, timeframe: str) -> int:
+    """Start of the fetch window in ms: the recent window or the last stored bar.
+
+    Reaching back to the last stored bar means downtime longer than the recent
+    window is refetched on the next run instead of leaving a permanent gap.
+    """
+    since = now_utc() - CRYPTO_RECENT_WINDOW.get(timeframe, timedelta(days=30))
+    last_ts = db.execute(
+        text(
+            "SELECT max(ts) FROM market.ohlcv "
+            "WHERE symbol_id = :sid AND timeframe = :tf"
+        ),
+        {"sid": symbol_id, "tf": timeframe},
+    ).scalar()
+    if last_ts is not None:
+        since = min(since, last_ts)
+    return int(since.timestamp() * 1000)
+
+
+def _fetch_crypto_since(
+    adapter: BinanceAdapter, symbol: str, timeframe: str, since_ms: int
+) -> list:
+    """Page through Binance from `since_ms` to the newest candle."""
+    candles: list = []
+    while True:
+        batch = adapter.fetch_historical_ohlcv(
+            symbol=symbol,
+            timeframe=timeframe,
+            since_timestamp_ms=since_ms,
+            limit=BINANCE_PAGE_LIMIT,
+        )
+        candles.extend(batch)
+        if len(batch) < BINANCE_PAGE_LIMIT:
+            return candles
+        since_ms = int(batch[-1].timestamp.timestamp() * 1000) + 1
 
 
 def _readjust_start(db, symbol_id: int, timeframe: str, candles: list) -> Any:

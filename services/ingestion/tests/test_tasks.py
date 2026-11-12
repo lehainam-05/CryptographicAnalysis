@@ -18,14 +18,19 @@ Chạy:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from services.ingestion.tasks import clean_and_store_task, ingest_stocks_task
+from services.ingestion.tasks import (
+    BINANCE_PAGE_LIMIT,
+    clean_and_store_task,
+    ingest_crypto_task,
+    ingest_stocks_task,
+)
 from shared.schemas.ohlcv import OHLCVCreate
 from shared.db.repositories.market_repo import (
     clear_caches,
@@ -256,3 +261,67 @@ class TestIngestStocksTask:
         )
         assert [float(c) for c in closes] == [90.0, 90.0]
         assert self._job(db, ticker)[0] == "success"
+
+
+class TestIngestCryptoTask:
+    """ingest_crypto_task lấy lùi tới nến cuối đã lưu và phân trang Binance."""
+
+    @patch("services.ingestion.tasks.BinanceAdapter")
+    def test_downtime_is_refetched_from_last_stored_bar(
+        self, mock_adapter_cls, db
+    ) -> None:
+        """Hệ thống tắt 10 ngày → lần chạy sau lấy từ nến cuối, qua nhiều trang."""
+        base = f"T{uuid.uuid4().hex[:5].upper()}"
+        ticker = f"{base}USDT"
+        eid = ensure_exchange(
+            db, "BINANCE", "Binance Cryptocurrency Exchange", "crypto", "UTC"
+        )
+        sid = ensure_symbol(db, eid, ticker, "crypto", "binance", base, "USDT")
+        last_ts = datetime.now(timezone.utc).replace(
+            minute=0, second=0, microsecond=0
+        ) - timedelta(days=10)
+        db.execute(
+            text(
+                "INSERT INTO market.ohlcv (symbol_id, timeframe, ts, open, high, low, close, volume) "
+                "VALUES (:sid, '1h', :ts, 1, 1, 1, 1, 1)"
+            ),
+            {"sid": sid, "ts": last_ts},
+        )
+        db.flush()
+
+        def candles(start: datetime, count: int) -> list[OHLCVCreate]:
+            return [
+                OHLCVCreate(
+                    timestamp=start + timedelta(hours=i),
+                    ticker_id=ticker,
+                    resolution="1h",
+                    open=1,
+                    high=1,
+                    low=1,
+                    close=1,
+                    volume=1,
+                )
+                for i in range(count)
+            ]
+
+        first_page = candles(last_ts, BINANCE_PAGE_LIMIT)
+        second_page = candles(last_ts + timedelta(hours=BINANCE_PAGE_LIMIT), 3)
+        adapter = mock_adapter_cls.return_value
+        adapter.fetch_historical_ohlcv.side_effect = [first_page, second_page]
+
+        ingest_crypto_task([f"{base}/USDT"], "1h")
+
+        calls = adapter.fetch_historical_ohlcv.call_args_list
+        assert len(calls) == 2
+        # Window starts at the last stored bar, not "now - 1 day".
+        assert calls[0].kwargs["since_timestamp_ms"] == int(last_ts.timestamp() * 1000)
+        assert calls[1].kwargs["since_timestamp_ms"] == (
+            int(first_page[-1].timestamp.timestamp() * 1000) + 1
+        )
+        stored = db.execute(
+            text(
+                "SELECT count(*) FROM market.ohlcv WHERE symbol_id = :sid AND timeframe = '1h'"
+            ),
+            {"sid": sid},
+        ).scalar()
+        assert stored == BINANCE_PAGE_LIMIT + 3

@@ -1,17 +1,13 @@
 """Load registered models from the MLflow Registry as ready-to-use predictors.
 
-Registry naming contract (all four trainers, see services/training/train_*.py):
+Registry naming contract (both trainers, see services/training/train_*.py):
 
-    {SYMBOL}_{timeframe}_{model_name}   e.g. ACB_1d_xgboost, BTCUSDT_1h_gru
+    {SYMBOL}_{timeframe}_{model_name}   e.g. ACB_1d_xgboost, BTCUSDT_1h_arima
 
 where SYMBOL is the ticker with '/' stripped and uppercased. Each model is
 logged with a different MLflow flavor, so loading is flavor-specific:
 
 - xgboost       -> mlflow.xgboost   + preprocessing/standard_scaler.joblib
-- random_forest -> mlflow.sklearn   (raw features, no scaler)
-- gru           -> mlflow.pytorch   + preprocessing/{feature,target}_scaler.joblib
-                   (falls back to rebuilding from model_state/gru_state_dict.pt
-                   when the training package is not importable)
 - arima         -> mlflow.statsmodels + metadata/pre_test_model.json
 """
 
@@ -32,18 +28,13 @@ from shared.config.settings import settings
 
 from predictors import (
     ArimaPredictor,
-    GRUPredictor,
     Predictor,
-    RandomForestPredictor,
     XGBoostPredictor,
 )
 
 logger = logging.getLogger(__name__)
 
 SCALER_ARTIFACT = "preprocessing/standard_scaler.joblib"
-GRU_FEATURE_SCALER_ARTIFACT = "preprocessing/feature_scaler.joblib"
-GRU_TARGET_SCALER_ARTIFACT = "preprocessing/target_scaler.joblib"
-GRU_STATE_DICT_ARTIFACT = "model_state/gru_state_dict.pt"
 ARIMA_METADATA_ARTIFACT = "metadata/pre_test_model.json"
 
 
@@ -148,53 +139,9 @@ class ModelLoader:
             model = mlflow.xgboost.load_model(model_uri)
             scaler = joblib.load(self._download(run_id, SCALER_ARTIFACT))
             return XGBoostPredictor(model, scaler)
-        if model_name == "random_forest":
-            model = mlflow.sklearn.load_model(model_uri)
-            return RandomForestPredictor(model)
-        if model_name == "gru":
-            return self._build_gru(model_uri, run_id)
         if model_name == "arima":
             return self._build_arima(model_uri, run_id)
         raise ModelLoadError(f"Unsupported model name: {model_name}")
-
-    def _build_gru(self, model_uri: str, run_id: str) -> GRUPredictor:
-        try:
-            import torch
-        except ImportError as exc:
-            raise ModelLoadError(
-                "PyTorch is not installed in the inference runtime; "
-                "GRU predictions are unavailable."
-            ) from exc
-
-        params = MlflowClient().get_run(run_id).data.params
-        try:
-            model = mlflow.pytorch.load_model(model_uri, map_location="cpu")
-        except Exception:
-            # The pickled module references services.training.models.gru_model,
-            # which is absent in the standalone image — rebuild from state dict.
-            logger.info("Rebuilding GRU from state dict (training package absent).")
-            from gru_net import GRUForecaster
-
-            # Defaults mirror train_gru.GRUTrainingConfig (8 features, 1 layer).
-            model = GRUForecaster(
-                input_size=int(params.get("input_size", 8)),
-                hidden_size=int(params.get("hidden_size", 64)),
-                num_layers=int(params.get("num_layers", 1)),
-                dropout=float(params.get("dropout", 0.0)),
-            )
-            state_path = self._download(run_id, GRU_STATE_DICT_ARTIFACT)
-            model.load_state_dict(torch.load(state_path, map_location="cpu"))
-
-        feature_scaler = joblib.load(
-            self._download(run_id, GRU_FEATURE_SCALER_ARTIFACT)
-        )
-        target_scaler = joblib.load(self._download(run_id, GRU_TARGET_SCALER_ARTIFACT))
-        return GRUPredictor(
-            model,
-            feature_scaler,
-            target_scaler,
-            sequence_length=int(params.get("sequence_length", 7)),
-        )
 
     def _build_arima(self, model_uri: str, run_id: str) -> ArimaPredictor:
         model = mlflow.statsmodels.load_model(model_uri)

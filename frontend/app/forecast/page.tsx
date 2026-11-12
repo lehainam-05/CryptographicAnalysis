@@ -23,7 +23,7 @@ import { Badge, Field, FilterBar, MetricRow, PageHeader, Panel, StateBox } from 
 
 const HISTORY_BARS = 120;
 const STEP_OPTIONS = [1, 3, 5, 7, 14, 30];
-const MODELS: ModelName[] = ["arima", "xgboost", "random_forest", "gru"];
+const MODELS: ModelName[] = ["arima", "xgboost"];
 
 const MODEL_INFO: Record<ModelName, { name: string; family: string; summary: string; caveat?: string }> = {
   arima: {
@@ -37,22 +37,11 @@ const MODEL_INFO: Record<ModelName, { name: string; family: string; summary: str
     summary: "Tập hợp cây quyết định tăng cường trên 19 đặc trưng kỹ thuật (lag, SMA, độ lệch, RSI, MACD, Bollinger, ATR); siêu tham số tối ưu bằng Optuna.",
     caveat: "Mô hình cây không ngoại suy được ra ngoài vùng giá đã thấy khi huấn luyện.",
   },
-  random_forest: {
-    name: "Random Forest",
-    family: "Học máy — rừng ngẫu nhiên",
-    summary: "Trung bình nhiều cây quyết định huấn luyện trên mẫu bootstrap với 18 đặc trưng giá/khối lượng trễ và thống kê cuộn.",
-    caveat: "Mô hình cây không ngoại suy được ra ngoài vùng giá đã thấy khi huấn luyện.",
-  },
-  gru: {
-    name: "GRU",
-    family: "Học sâu — mạng hồi tiếp (PyTorch)",
-    summary: "Mạng GRU đọc chuỗi 8 đặc trưng; đầu ra là phần hiệu chỉnh cộng vào giá đóng cửa gần nhất (residual), khởi tạo đúng bằng baseline Naive.",
-  },
 };
 
 export default function ForecastPage() {
   const { symbols, ticker, setTicker, selected, error: symbolsError, reload: reloadSymbols } = useSymbols();
-  const [modelName, setModelName] = useState<ModelName>("gru");
+  const [modelName, setModelName] = useState<ModelName>("arima");
   const [timeframe, setTimeframe] = useState<Timeframe>("1d");
   const [steps, setSteps] = useState(5);
 
@@ -115,7 +104,7 @@ export default function ForecastPage() {
       setForecast(null);
       setForecastError(
         err instanceof ApiError && err.status === 503
-          ? `Chưa có mô hình ${registryName(ticker, timeframe, modelName)} trong MLflow Registry. Huấn luyện bằng: python train_${modelName}.py --ticker ${ticker} --timeframe ${timeframe}`
+          ? `Chưa có mô hình ${registryName(ticker, timeframe, modelName)} trong MLflow Registry. Huấn luyện bằng: docker compose run --rm training python -m services.training.train_${modelName} --ticker ${ticker} --timeframe ${timeframe}`
           : describeApiError(err)
       );
     } finally {

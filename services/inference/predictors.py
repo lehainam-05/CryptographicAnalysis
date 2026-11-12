@@ -10,7 +10,7 @@ volume, ts tz-aware UTC ascending). The returned list holds absolute close
 prices in original units, one per future step.
 
 Multi-step notes:
-- XGBoost / Random Forest / GRU are trained for horizon 1. Steps beyond the
+- XGBoost is trained for horizon 1. Steps beyond the
   first are produced iteratively by appending a synthetic bar built from the
   previous prediction (open=high=low=close=prediction, volume carried
   forward) and recomputing features. This is a documented approximation.
@@ -27,21 +27,12 @@ import numpy as np
 import pandas as pd
 
 from features import (
-    GRU_FEATURE_LIST,
-    GRU_FEATURE_WARMUP_ROWS,
-    RANDOM_FOREST_FEATURE_LIST,
     XGBOOST_FEATURE_LIST,
-    build_gru_live_features,
-    build_random_forest_live_features,
     build_xgboost_live_features,
     latest_feature_row,
 )
 
 logger = logging.getLogger(__name__)
-
-# Defaults mirror services/training/train_gru.GRUTrainingConfig; the loader
-# overrides them with the values logged on the MLflow run.
-GRU_SEQUENCE_LENGTH = 7
 
 
 class Predictor(Protocol):
@@ -83,86 +74,6 @@ class XGBoostPredictor:
             value = float(np.asarray(self.model.predict(scaled_frame)).reshape(-1)[0])
             predictions.append(value)
             frame = _append_synthetic_bar(frame, value)
-        return predictions
-
-
-class RandomForestPredictor:
-    """Serve the raw RandomForestRegressor logged by train_random_forest."""
-
-    def __init__(self, model: Any) -> None:
-        self.model = model
-
-    def predict_steps(self, history: pd.DataFrame, steps: int) -> list[float]:
-        frame = history.loc[:, ["ts", "open", "high", "low", "close", "volume"]].copy()
-        predictions: list[float] = []
-        for _ in range(steps):
-            featured = build_random_forest_live_features(frame)
-            row = latest_feature_row(featured, RANDOM_FOREST_FEATURE_LIST)
-            value = float(np.asarray(self.model.predict(row)).reshape(-1)[0])
-            predictions.append(value)
-            frame = _append_synthetic_bar(frame, value)
-        return predictions
-
-
-class GRUPredictor:
-    """Serve the GRUForecaster + two MinMaxScalers logged by train_gru.
-
-    Input contract (train_gru.py): a window of the last ``sequence_length``
-    rows of the 8 scaled features in ``GRU_FEATURE_LIST``, inclusive of the
-    current bar. The network has a residual head — it returns
-    ``last scaled close + correction`` — so the output is already a scaled
-    next close and only needs the target scaler's inverse transform. Both
-    scalers share one mapping (the target scaler is fit on the training
-    ``close`` column), which the residual sum relies on.
-    """
-
-    def __init__(
-        self,
-        model: Any,
-        feature_scaler: Any,
-        target_scaler: Any,
-        sequence_length: int = GRU_SEQUENCE_LENGTH,
-    ) -> None:
-        if sequence_length <= 0:
-            raise ValueError("GRU sequence_length must be positive.")
-        self.model = model
-        self.feature_scaler = feature_scaler
-        self.target_scaler = target_scaler
-        self.sequence_length = sequence_length
-
-    @property
-    def min_history_rows(self) -> int:
-        """Bars needed so the oldest window row has every 14-bar feature."""
-        return self.sequence_length + GRU_FEATURE_WARMUP_ROWS - 1
-
-    def predict_steps(self, history: pd.DataFrame, steps: int) -> list[float]:
-        import torch
-
-        closes = history["close"].astype(float).reset_index(drop=True)
-        if len(closes) < self.min_history_rows:
-            raise ValueError(
-                f"GRU needs at least {self.min_history_rows} bars of history, "
-                f"got {len(closes)}."
-            )
-
-        self.model.eval()
-        predictions: list[float] = []
-        for _ in range(steps):
-            featured = build_gru_live_features(closes)
-            window = featured.loc[:, GRU_FEATURE_LIST].tail(self.sequence_length)
-            if len(window) != self.sequence_length:
-                raise ValueError("GRU feature window is shorter than sequence_length.")
-            # Pass the named frame: the scaler was fit on a frame with these
-            # column names, so sklearn validates the order instead of warning.
-            scaled = np.asarray(self.feature_scaler.transform(window), dtype=np.float32)
-            inputs = torch.from_numpy(scaled).unsqueeze(0)
-            with torch.no_grad():
-                scaled_prediction = self.model(inputs).reshape(-1)[0].item()
-            value = float(
-                self.target_scaler.inverse_transform([[scaled_prediction]])[0][0]
-            )
-            predictions.append(value)
-            closes = pd.concat([closes, pd.Series([value])], ignore_index=True)
         return predictions
 
 

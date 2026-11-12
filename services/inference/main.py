@@ -460,8 +460,7 @@ def explain_model(
     """
     Trả về giải thích mô hình đọc từ artifact
     explainability/feature_importance.json mà entrypoint train của từng model
-    log lên MLflow: SHAP (xgboost, random_forest), permutation importance
-    (gru) hoặc bảng hệ số (arima). Trường ``method`` cho biết loại nào.
+    log lên MLflow: SHAP (xgboost) hoặc bảng hệ số (arima). Trường ``method`` cho biết loại nào.
     """
     timeframe = timeframe.strip().lower()
     if timeframe not in ALLOWED_TIMEFRAMES:
@@ -507,8 +506,6 @@ def explain_model(
         features=features,
         generated_at=payload.get("generated_at"),
         n_samples=payload.get("n_samples"),
-        baseline_rmse=payload.get("baseline_rmse"),
-        n_repeats=payload.get("n_repeats"),
         order=payload.get("order"),
         n_observations=payload.get("n_observations"),
     )

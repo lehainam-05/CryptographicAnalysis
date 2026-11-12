@@ -2,15 +2,15 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
-# Các model nằm trong phạm vi đề tài (LSTM đã bị loại — xem AGENTS.md §4)
-ALLOWED_MODELS = ("arima", "xgboost", "random_forest", "gru")
+# Các model nằm trong phạm vi đề tài (GRU, Random Forest, LSTM đã bị loại)
+ALLOWED_MODELS = ("arima", "xgboost")
 ALLOWED_TIMEFRAMES = ("1d", "1h")
 
 
 class PredictRequest(BaseModel):
     ticker_id: str = Field(..., description="Mã tài sản, ví dụ: FPT hoặc BTCUSDT")
     model_name: str = Field(
-        ..., description="Tên mô hình: arima, xgboost, random_forest, gru"
+        ..., description="Tên mô hình: arima, xgboost"
     )
     steps: int = Field(5, ge=1, le=30, description="Số bước cần dự báo về tương lai")
     timeframe: Optional[str] = Field(
@@ -75,10 +75,8 @@ class ExplainFeature(BaseModel):
     """Một feature (hoặc tham số ARIMA) trong kết quả giải thích mô hình.
 
     Ý nghĩa của ``importance`` phụ thuộc ``ExplainResponse.method``:
-    - ``shap_tree_explainer`` (xgboost, random_forest): độ quan trọng của cây,
+    - ``shap_tree_explainer`` (xgboost): độ quan trọng của cây,
       kèm ``mean_abs_shap``.
-    - ``permutation_importance`` (gru): RMSE tăng thêm (đơn vị giá) khi xáo
-      trộn feature, kèm độ lệch chuẩn ``importance_std`` qua các lần lặp.
     - ``arima_coefficients`` (arima): |hệ số|, kèm ``coefficient`` có dấu,
       ``std_error`` và ``p_value``.
     """
@@ -86,7 +84,6 @@ class ExplainFeature(BaseModel):
     feature: str
     importance: float
     mean_abs_shap: Optional[float] = None
-    importance_std: Optional[float] = None
     coefficient: Optional[float] = None
     std_error: Optional[float] = None
     p_value: Optional[float] = None
@@ -102,7 +99,5 @@ class ExplainResponse(BaseModel):
     features: List[ExplainFeature]
     generated_at: Optional[datetime] = None
     n_samples: Optional[int] = None
-    baseline_rmse: Optional[float] = None
-    n_repeats: Optional[int] = None
     order: Optional[List[int]] = None
     n_observations: Optional[int] = None

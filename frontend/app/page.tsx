@@ -19,7 +19,7 @@ const FLOW = [
   { href: "/pipeline", icon: DownloadCloud, title: "1. Thu thập", text: "Celery Beat gọi vnstock (cổ phiếu VN) và Binance (crypto) theo lịch, lưu thô vào market.ohlcv_raw." },
   { href: "/pipeline", icon: Eraser, title: "2. Làm sạch", text: "Chuẩn hóa UTC, loại trùng, điền phiên thiếu, gắn cờ outlier IQR → market.ohlcv." },
   { href: "/analysis", icon: LineChart, title: "3. Phân tích", text: "Thống kê mô tả, nến + SMA, khối lượng, RSI, MACD cho từng mã." },
-  { href: "/forecast", icon: Sparkles, title: "4. Dự báo", text: "ARIMA, XGBoost, Random Forest, GRU từ MLflow Registry, so với baseline Naive." },
+  { href: "/forecast", icon: Sparkles, title: "4. Dự báo", text: "ARIMA và XGBoost từ MLflow Registry, so với baseline Naive." },
 ];
 
 export default function OverviewPage() {

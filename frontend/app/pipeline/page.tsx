@@ -56,8 +56,6 @@ const CLEANING_STEPS = [
 const SCALING = [
   { model: "ARIMA(1,1,1)", method: "Không co giãn; sai phân bậc 1 (d = 1) để chuỗi dừng", fit: "—" },
   { model: "XGBoost", method: "StandardScaler (Z-score) cho 19 đặc trưng", fit: "Chỉ trên tập train, rồi transform validation/test" },
-  { model: "Random Forest", method: "Không co giãn (cây quyết định bất biến với phép co giãn đơn điệu)", fit: "—" },
-  { model: "GRU", method: "MinMaxScaler [0, 1] cho 8 đặc trưng và biến mục tiêu", fit: "Chỉ trên tập train, rồi transform validation/test" },
 ];
 
 export default function PipelinePage() {

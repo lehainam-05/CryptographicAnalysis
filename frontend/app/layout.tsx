@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Hệ thống phân tích & dự báo giá cổ phiếu – tiền số | NCKH",
   description:
-    "Thu thập, làm sạch, phân tích và dự báo giá cổ phiếu Việt Nam & tiền mã hóa bằng ARIMA, XGBoost, Random Forest, GRU; giải thích mô hình bằng SHAP.",
+    "Thu thập, làm sạch, phân tích và dự báo giá cổ phiếu Việt Nam & tiền mã hóa bằng ARIMA và XGBoost; giải thích mô hình bằng SHAP.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

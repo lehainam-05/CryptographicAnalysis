@@ -9,29 +9,22 @@ import { Badge, Field, FilterBar, MetricRow, PageHeader, Panel, StateBox } from 
 
 const MODEL_OPTIONS: { value: ModelName; label: string }[] = [
   { value: "xgboost", label: "XGBoost" },
-  { value: "random_forest", label: "Random Forest" },
-  { value: "gru", label: "GRU" },
   { value: "arima", label: "ARIMA" },
 ];
 
 const MODEL_LABEL: Record<ModelName, string> = {
   xgboost: "XGBoost",
-  random_forest: "Random Forest",
-  gru: "GRU",
   arima: "ARIMA",
 };
 
 /** Which explanation each model's training entrypoint logs (see docs/api.md §7). */
 const METHOD_OF: Record<ModelName, string> = {
   xgboost: "shap_tree_explainer",
-  random_forest: "shap_tree_explainer",
-  gru: "permutation_importance",
   arima: "arima_coefficients",
 };
 
 const METHOD_LABEL: Record<string, string> = {
   shap_tree_explainer: "SHAP TreeExplainer",
-  permutation_importance: "Permutation importance",
   arima_coefficients: "Hệ số ARIMA",
 };
 
@@ -41,15 +34,14 @@ const PARAM_MEANING: Record<string, string> = {
   sigma2: "Phương sai của phần nhiễu mà mô hình không giải thích được.",
 };
 
-type Bar = { name: string; value: number; spread: number | null };
+type Bar = { name: string; value: number };
 
-/** Bars for the tree/GRU methods: mean |SHAP| for trees, mean RMSE increase for GRU. */
+/** Bars for the SHAP method: mean |SHAP| per feature. */
 function toBars(data: ExplainResponse): Bar[] {
   return data.features
     .map((f) => ({
       name: f.feature,
       value: data.method === "shap_tree_explainer" ? f.mean_abs_shap ?? f.importance : f.importance,
-      spread: f.importance_std ?? null,
     }))
     .sort((a, b) => a.value - b.value);
 }
@@ -89,14 +81,13 @@ export default function ExplainabilityPage() {
 
   const method = data?.method ?? METHOD_OF[modelName];
   const isArima = method === "arima_coefficients";
-  const unit = selected?.asset_class === "crypto" ? "USD" : "nghìn VND";
   const stateHeight = isArima ? "h-64" : "h-full";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Giải thích mô hình"
-        description="Mô hình dựa vào đâu để dự báo: SHAP cho XGBoost và Random Forest, permutation importance cho GRU, bảng hệ số cho ARIMA. Mọi giá trị được tính lúc huấn luyện và đọc từ MLflow."
+        description="Mô hình dựa vào đâu để dự báo: SHAP cho XGBoost, bảng hệ số cho ARIMA. Mọi giá trị được tính lúc huấn luyện và đọc từ MLflow."
       />
 
       <FilterBar>
@@ -135,7 +126,7 @@ export default function ExplainabilityPage() {
             <StateBox
               kind="empty"
               message="Chưa có kết quả giải thích cho mô hình này"
-              hint={`Huấn luyện bằng: python train_${modelName}.py --ticker ${ticker} --timeframe ${timeframe}`}
+              hint={`Huấn luyện bằng: docker compose run --rm training python -m services.training.train_${modelName} --ticker ${ticker} --timeframe ${timeframe}`}
               height={stateHeight}
             />
           ) : error ? (
@@ -145,12 +136,12 @@ export default function ExplainabilityPage() {
           ) : isArima ? (
             <CoefficientTable data={data} />
           ) : (
-            <FeatureChart bars={toBars(data)} method={method} unit={unit} />
+            <FeatureChart bars={toBars(data)} />
           )}
         </Panel>
 
         <div className="flex flex-col gap-6">
-          <SummaryPanel data={data} unit={unit} />
+          <SummaryPanel data={data} />
           <GuidePanel method={method} />
         </div>
       </div>
@@ -158,8 +149,8 @@ export default function ExplainabilityPage() {
   );
 }
 
-function FeatureChart({ bars, method, unit }: { bars: Bar[]; method: string; unit: string }) {
-  const axisName = method === "permutation_importance" ? `RMSE tăng thêm (${unit})` : "mean |SHAP|";
+function FeatureChart({ bars }: { bars: Bar[] }) {
+  const axisName = "mean |SHAP|";
   const option = {
     backgroundColor: "transparent",
     tooltip: {
@@ -168,8 +159,7 @@ function FeatureChart({ bars, method, unit }: { bars: Bar[]; method: string; uni
       ...CHART_THEME.tooltip,
       formatter: (params: { dataIndex: number }[]) => {
         const bar = bars[params[0].dataIndex];
-        const spread = bar.spread !== null ? ` (± ${bar.spread.toPrecision(3)})` : "";
-        return `${bar.name}<br/>${axisName}: ${bar.value.toPrecision(4)}${spread}`;
+        return `${bar.name}<br/>${axisName}: ${bar.value.toPrecision(4)}`;
       },
     },
     grid: { left: 8, right: 60, top: 10, bottom: 30, containLabel: true },
@@ -247,7 +237,7 @@ function arimaCancellationNote(data: ExplainResponse): string | null {
   return `ar.L1 + ma.L1 = ${formatNum(ar + ma, 3)}. Tổng càng gần 0 thì hai thành phần càng triệt tiêu nhau và ARIMA(1,1,1) càng gần bước ngẫu nhiên (dự báo ≈ giá đóng cửa gần nhất), một lý do khiến ARIMA bám sát baseline Naive.`;
 }
 
-function SummaryPanel({ data, unit }: { data: ExplainResponse | null; unit: string }) {
+function SummaryPanel({ data }: { data: ExplainResponse | null }) {
   if (data?.method === "arima_coefficients") {
     const note = arimaCancellationNote(data);
     return (
@@ -267,13 +257,6 @@ function SummaryPanel({ data, unit }: { data: ExplainResponse | null; unit: stri
       ) : (
         top.map((f, i) => <MetricRow key={f.name} label={`${i + 1}. ${f.name}`} value={f.value.toPrecision(4)} />)
       )}
-      {data?.method === "permutation_importance" && data.baseline_rmse != null && (
-        <MetricRow
-          label="RMSE gốc trên tập test"
-          value={`${formatNum(data.baseline_rmse, 4)} ${unit}`}
-          note={`${data.n_repeats ?? "?"} lần xáo trộn mỗi đặc trưng`}
-        />
-      )}
       {data && <p className="text-[11px] text-slate-500">Artifact tạo lúc {formatDate(data.generated_at, true)}</p>}
     </Panel>
   );
@@ -282,13 +265,7 @@ function SummaryPanel({ data, unit }: { data: ExplainResponse | null; unit: stri
 function GuidePanel({ method }: { method: string }) {
   return (
     <Panel title="Cách đọc kết quả" bodyClassName="space-y-2 p-4 text-sm leading-relaxed text-slate-300">
-      {method === "permutation_importance" ? (
-        <>
-          <p>Mỗi đặc trưng được xáo trộn giữa các chuỗi 7 bước của tập kiểm thử (giữ nguyên phân phối, phá vỡ liên hệ với giá cần dự báo), lặp lại vài lần với seed cố định. Cột là mức RMSE tăng thêm so với RMSE gốc: càng lớn, GRU càng phụ thuộc vào đặc trưng đó.</p>
-          <p>Giá trị gần 0 hoặc âm (màu xám) nghĩa là xáo trộn đặc trưng gần như không làm dự báo kém đi, tức mô hình hầu như không dùng nó.</p>
-          <p className="text-xs text-slate-500">GRU dự báo phần hiệu chỉnh cộng vào giá đóng cửa gần nhất (residual), nên đặc trưng close thường chi phối.</p>
-        </>
-      ) : method === "arima_coefficients" ? (
+      {method === "arima_coefficients" ? (
         <>
           <p>ARIMA chỉ dùng chuỗi giá đóng cửa nên không có đặc trưng để xếp hạng. Phần giải thích là các tham số ước lượng trên tập huấn luyện; d = 1 nghĩa là mô hình dự báo phần thay đổi giá (sai phân) thay vì mức giá.</p>
           <p>p-value &lt; 0,05: hệ số khác 0 có ý nghĩa thống kê ở mức 5%. Sai số chuẩn lớn so với hệ số nghĩa là ước lượng kém chắc chắn.</p>
@@ -297,7 +274,6 @@ function GuidePanel({ method }: { method: string }) {
         <>
           <p>SHAP phân rã mỗi dự báo thành tổng đóng góp của từng đặc trưng. Giá trị mean |SHAP| là độ lớn đóng góp trung bình trên tập kiểm thử: càng lớn, đặc trưng càng chi phối dự báo.</p>
           <p>Với dữ liệu giá, các đặc trưng trễ (close_lag_*) và trung bình trượt thường đứng đầu: mô hình chủ yếu bám mức giá gần nhất, phù hợp với việc baseline Naive rất khó bị vượt qua.</p>
-          <p className="text-xs text-slate-500">XGBoost và Random Forest dùng chung phương pháp nên so sánh trực tiếp được với nhau.</p>
         </>
       )}
     </Panel>

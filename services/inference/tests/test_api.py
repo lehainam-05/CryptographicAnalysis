@@ -175,7 +175,7 @@ def test_predict_crypto_steps_follow_calendar_days(
         headers=API_HEADERS,
         json={
             "ticker_id": "BTCUSDT",
-            "model_name": "gru",
+            "model_name": "xgboost",
             "steps": 4,
             "timeframe": "1d",
         },
@@ -209,7 +209,7 @@ def test_predict_respects_explicit_timeframe(
         headers=API_HEADERS,
         json={
             "ticker_id": "BTC/USDT",
-            "model_name": "random_forest",
+            "model_name": "arima",
             "steps": 1,
             "timeframe": "1d",
         },
@@ -219,7 +219,7 @@ def test_predict_respects_explicit_timeframe(
     assert captured == {
         "ticker": "BTCUSDT",
         "timeframe": "1d",
-        "model_name": "random_forest",
+        "model_name": "arima",
     }
 
 
@@ -239,13 +239,13 @@ def test_predict_unregistered_model_is_503_without_mock_fallback(
     _override_db(_FakeSession(symbol_row=(7, "stock"), ohlcv_rows=_ohlcv_rows()))
 
     def raise_not_registered(*args: Any) -> None:
-        raise ModelNotRegisteredError("Model 'ACB_1d_gru' is not registered")
+        raise ModelNotRegisteredError("Model 'ACB_1d_xgboost' is not registered")
 
     monkeypatch.setattr(main.model_loader, "load", raise_not_registered)
     response = client.post(
         "/api/v1/predict",
         headers=API_HEADERS,
-        json={"ticker_id": "ACB", "model_name": "gru", "steps": 2},
+        json={"ticker_id": "ACB", "model_name": "xgboost", "steps": 2},
     )
     assert response.status_code == 503
     assert "not registered" in response.json()["detail"]
@@ -268,11 +268,14 @@ def test_predict_mlflow_down_is_503(
     assert response.status_code == 503
 
 
-def test_predict_rejects_lstm_and_accepts_random_forest(client: TestClient) -> None:
+@pytest.mark.parametrize("model_name", ["lstm", "gru", "random_forest"])
+def test_predict_rejects_models_out_of_scope(
+    client: TestClient, model_name: str
+) -> None:
     response = client.post(
         "/api/v1/predict",
         headers=API_HEADERS,
-        json={"ticker_id": "ACB", "model_name": "lstm", "steps": 1},
+        json={"ticker_id": "ACB", "model_name": model_name, "steps": 1},
     )
     assert response.status_code == 422
 
@@ -465,40 +468,6 @@ def _serve_artifact(
         "download_artifacts",
         lambda run_id, artifact_path: str(artifact),
     )
-
-
-def test_explain_serves_gru_permutation_artifact(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path
-) -> None:
-    _serve_artifact(
-        monkeypatch,
-        tmp_path,
-        {
-            "method": "permutation_importance",
-            "metric": "rmse",
-            "baseline_rmse": 0.39,
-            "n_repeats": 5,
-            "n_samples": 70,
-            "features": [
-                {"feature": "close", "importance": 1.2, "importance_std": 0.1},
-                {"feature": "return_1d", "importance": -0.01, "importance_std": 0.0},
-            ],
-        },
-    )
-    response = client.get(
-        "/api/v1/explain",
-        headers=API_HEADERS,
-        params={"ticker": "ACB", "model_name": "gru"},
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert body["model_name"] == "gru"
-    assert body["method"] == "permutation_importance"
-    assert body["baseline_rmse"] == pytest.approx(0.39)
-    assert body["n_repeats"] == 5
-    assert body["n_samples"] == 70
-    assert body["features"][0]["importance_std"] == pytest.approx(0.1)
-    assert body["features"][1]["importance"] == pytest.approx(-0.01)
 
 
 def test_explain_serves_arima_coefficient_artifact(

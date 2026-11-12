@@ -25,8 +25,8 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Default command for development
-CMD ["npm", "run", "dev"]
+# Port 3000 in the container (mapped to FRONTEND_PORT); `npm run dev` on the host uses 3100
+CMD ["npx", "next", "dev", "-p", "3000"]
 
 # ---------- Prod target: next build + next start ----------
 FROM base AS prod

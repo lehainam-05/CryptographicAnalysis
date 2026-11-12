@@ -11,7 +11,7 @@ Vui lòng tích chọn trước khi mở/merge PR:
 - [ ] **Đã định dạng và kiểm tra lỗi code bằng Ruff (Python) hoặc Prettier/ESLint (Frontend) sạch sẽ.**
 - [ ] **Đã cập nhật tài liệu (`docs/` hoặc các file tài liệu liên quan) nếu có sự thay đổi hành vi hệ thống.**
 - [ ] **Tuyệt đối không commit các khóa bí mật (secrets, API keys, dữ liệu nhạy cảm) và file `.env` thực.**
-- [ ] **Tuân thủ đầy đủ các quy tắc trong [AGENTS.md](file:///d:/sources/repos/NCKH/AGENTS.md) (Sử dụng PyTorch cho DL, không rò rỉ dữ liệu, cố định random seed, log MLflow).**
+- [ ] **Tuân thủ đầy đủ các quy tắc trong [AGENTS.md](file:///d:/sources/repos/NCKH/AGENTS.md) (không rò rỉ dữ liệu, cố định random seed, log MLflow).**
 
 ## Reviewer được chỉ định (Assigned Reviewer)
 - [ ] @tv1-lead-data (TV1)

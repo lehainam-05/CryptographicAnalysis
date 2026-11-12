@@ -26,8 +26,6 @@ def _log_model(
 
     if hasattr(model, "predict") and "xgboost" in run_name.lower():
         mlflow.xgboost.log_model(model, **log_options)
-    elif hasattr(model, "state_dict"):
-        mlflow.pytorch.log_model(model, **log_options)
     else:
         mlflow.sklearn.log_model(model, **log_options)
 

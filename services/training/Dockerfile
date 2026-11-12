@@ -17,8 +17,8 @@ RUN pip install --no-cache-dir -e /app/shared
 # Copy training service files
 COPY services/training /app/services/training
 
-# Install requirements (using CPU-only torch to keep image size reasonable)
-RUN pip install --no-cache-dir -r /app/services/training/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+# Install requirements
+RUN pip install --no-cache-dir -r /app/services/training/requirements.txt
 
 # `import shared...` resolves from /app (the editable install above exposes no
 # top-level `shared` package). docker-compose.yml sets the same for dev.

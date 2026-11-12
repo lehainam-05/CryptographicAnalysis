@@ -1,4 +1,4 @@
-"""Contract tests for the explicit four-model ACB 1d benchmark evaluator."""
+"""Contract tests for the explicit two-model ACB 1d benchmark evaluator."""
 
 from __future__ import annotations
 
@@ -181,16 +181,12 @@ def _fake_run(
     )
 
 
-def test_cli_requires_all_four_explicit_run_ids(tmp_path: Path) -> None:
+def test_cli_requires_all_two_explicit_run_ids(tmp_path: Path) -> None:
     with pytest.raises(SystemExit):
         benchmark.parse_args(
             [
                 "--xgboost-run-id",
                 "x",
-                "--random-forest-run-id",
-                "r",
-                "--gru-run-id",
-                "g",
                 "--output-dir",
                 str(tmp_path),
             ]
@@ -199,7 +195,7 @@ def test_cli_requires_all_four_explicit_run_ids(tmp_path: Path) -> None:
 
 def test_explicit_run_mapping_rejects_duplicate_ids(tmp_path: Path) -> None:
     run_ids = _run_ids()
-    run_ids["arima"] = run_ids["gru"]
+    run_ids["arima"] = run_ids["xgboost"]
     with pytest.raises(benchmark.BenchmarkValidationError, match="distinct"):
         benchmark.explicit_run_ids(_args(run_ids, tmp_path))
 
@@ -247,7 +243,7 @@ def test_prediction_contract_rejects_invalid_content(
     elif mutation == "short_rows":
         frame = frame.iloc[:-1].copy()
     elif mutation == "wrong_model":
-        frame["model"] = "gru"
+        frame["model"] = "arima"
     elif mutation == "wrong_seed":
         frame["seed"] = 7
     elif mutation == "wrong_run_id":
@@ -472,7 +468,7 @@ def test_metadata_rejects_explicitly_superseded_run(
 @pytest.mark.parametrize(
     ("field", "wrong"),
     [
-        ("model", "gru"),
+        ("model", "arima"),
         ("seed", "7"),
         ("target", "timestamp"),
         ("horizon", "2"),
@@ -617,15 +613,16 @@ def test_naive_identity_mismatch_invalidates_offending_model(
     }
     for evaluation in evaluations.values():
         evaluation.failure_reasons.clear()
-    evaluations["gru"].recomputed_metrics["naive_rmse"] += 0.1
+    # xgboost (MODEL_NAMES[0]) is the reference, so the offender must be arima.
+    evaluations["arima"].recomputed_metrics["naive_rmse"] += 0.1
     result = benchmark.finalize_eligibility(evaluations)
     _expect(not result, "Naive mismatch did not fail the benchmark")
     _expect(
-        evaluations["gru"].status == "invalid",
-        "Offending GRU run was not marked invalid",
+        evaluations["arima"].status == "invalid",
+        "Offending ARIMA run was not marked invalid",
     )
     _expect(
-        evaluations["arima"].status == "excluded",
+        evaluations["xgboost"].status == "excluded",
         "Otherwise valid run was not excluded from incomplete ranking",
     )
 
@@ -633,8 +630,6 @@ def test_naive_identity_mismatch_invalidates_offending_model(
 def _rank_evaluations() -> dict[str, benchmark.ModelEvaluation]:
     values = {
         "xgboost": (0.4, 0.5, 0.60),
-        "random_forest": (0.4, 0.5, 0.55),
-        "gru": (0.3, 0.5, 0.40),
         "arima": (0.2, 0.4, 0.50),
     }
     evaluations: dict[str, benchmark.ModelEvaluation] = {}
@@ -663,7 +658,7 @@ def test_ranking_uses_rmse_mae_and_directional_accuracy() -> None:
     ranking = benchmark.rank_valid_models(_rank_evaluations())
     _expect(
         [evaluation.model for evaluation in ranking]
-        == ["arima", "gru", "xgboost", "random_forest"],
+        == ["arima", "xgboost"],
         "Protocol ranking order is incorrect",
     )
 
@@ -682,11 +677,11 @@ def test_ranking_uses_model_name_only_as_full_tie_fallback() -> None:
 
 def test_invalid_or_missing_model_cannot_be_ranked() -> None:
     evaluations = _rank_evaluations()
-    evaluations["gru"].status = "invalid"
-    with pytest.raises(benchmark.BenchmarkValidationError, match="four valid"):
+    evaluations["xgboost"].status = "invalid"
+    with pytest.raises(benchmark.BenchmarkValidationError, match="two valid"):
         benchmark.rank_valid_models(evaluations)
-    evaluations.pop("gru")
-    with pytest.raises(benchmark.BenchmarkValidationError, match="four valid"):
+    evaluations.pop("xgboost")
+    with pytest.raises(benchmark.BenchmarkValidationError, match="two valid"):
         benchmark.rank_valid_models(evaluations)
 
 
@@ -700,7 +695,7 @@ def test_overview_uses_exact_protocol_schema_without_index(
         tuple(rows[0]) == OVERVIEW_COLUMNS,
         "Overview row schema differs from the protocol",
     )
-    _expect([row["rank"] for row in rows] == [1, 2, 3, 4], "Ranks are invalid")
+    _expect([row["rank"] for row in rows] == [1, 2], "Ranks are invalid")
 
 
 def test_report_contains_all_required_sections(
@@ -1143,10 +1138,6 @@ def test_main_returns_nonzero_for_contract_failure(
         [
             "--xgboost-run-id",
             "x",
-            "--random-forest-run-id",
-            "r",
-            "--gru-run-id",
-            "g",
             "--arima-run-id",
             "a",
             "--output-dir",

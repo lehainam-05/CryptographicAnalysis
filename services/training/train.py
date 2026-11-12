@@ -1,7 +1,7 @@
 """
 Stock and Crypto Training Pipeline.
 
-Supports 4 models: ARIMA, Random Forest, XGBoost, GRU.
+Supports 2 models: ARIMA, XGBoost.
 Reads data from ``market.ohlcv``, engineers features, splits by time
 (train 70% / val 15% / test 15%), computes Naive baseline, and logs
 all metrics to MLflow.
@@ -15,13 +15,11 @@ from typing import Any, Dict
 
 import numpy as np
 import optuna
-import torch
 
 from shared.utils.logging import setup_logging
 from data_loader import DataLoader, FEATURE_COLUMNS
 from models.arima_model import ARIMABaseline
 from models.xgboost_model import XGBoostModelWrapper
-from models.random_forest_model import RandomForestModelWrapper
 from evaluate import evaluate_predictions, add_improvement_vs_naive
 from mlflow_utils import log_experiment_run
 from dataset_contract import (
@@ -45,7 +43,6 @@ RANDOM_SEED: int = 42
 
 random.seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
-torch.manual_seed(RANDOM_SEED)
 
 
 # ==============================================================================
@@ -64,7 +61,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=str,
-        choices=["arima", "xgboost", "random_forest", "gru"],
+        choices=["arima", "xgboost"],
         default="xgboost",
         help="Algorithm to train",
     )
@@ -323,35 +320,6 @@ def run_pipeline() -> None:
         trained_model = xgb_wrapper.model
         preds = xgb_wrapper.predict(X_test)
 
-    elif args.model == "random_forest":
-        if args.tune:
-            logger.info(
-                "Optuna tuning not yet implemented for Random Forest. Using defaults."
-            )
-
-        params_logged = {
-            "n_estimators": 200,
-            "max_depth": 10,
-            "min_samples_split": 5,
-            "min_samples_leaf": 2,
-            "random_state": RANDOM_SEED,
-        }
-
-        rf_wrapper = RandomForestModelWrapper(params=params_logged)
-        rf_wrapper.fit(X_train, y_train)
-        trained_model = rf_wrapper.model
-        preds = rf_wrapper.predict(X_test)
-
-    elif args.model == "gru":
-        # TODO: Implement full PyTorch training loop.
-        # Requires: TimeSeriesDataset, DataLoader, train/eval loop,
-        # scaler (fit on train only), create_sequences(), early stopping.
-        # See models/nn_models.py for GRUForecaster and create_sequences().
-        raise NotImplementedError(
-            "GRU training loop is not yet implemented. "
-            "See services/training/models/nn_models.py for the model class "
-            "and create_sequences() helper. Contributions welcome!"
-        )
 
     # ------------------------------------------------------------------
     # 6. Evaluate

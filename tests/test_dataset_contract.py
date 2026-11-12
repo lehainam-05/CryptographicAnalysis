@@ -47,18 +47,12 @@ def _install_training_import_stubs() -> None:
     sklearn_module = types.ModuleType("sklearn")
     model_selection_module = types.ModuleType("sklearn.model_selection")
     model_selection_module.TimeSeriesSplit = _DummyTimeSeriesSplit
-    ensemble_module = types.ModuleType("sklearn.ensemble")
-    ensemble_module.RandomForestRegressor = _DummyModel
     sys.modules.setdefault("sklearn", sklearn_module)
     sys.modules.setdefault("sklearn.model_selection", model_selection_module)
-    sys.modules.setdefault("sklearn.ensemble", ensemble_module)
 
     optuna_module = _module("optuna")
     optuna_module.Trial = object
     optuna_module.create_study = lambda *args, **kwargs: None
-
-    torch_module = _module("torch")
-    torch_module.manual_seed = lambda seed: None
 
     xgboost_module = _module("xgboost")
     xgboost_module.XGBRegressor = _DummyModel

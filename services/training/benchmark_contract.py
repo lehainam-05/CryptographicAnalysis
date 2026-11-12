@@ -1,4 +1,4 @@
-"""Shared, machine-readable contract for the ACB 1d four-model benchmark."""
+"""Shared, machine-readable contract for the ACB 1d two-model benchmark."""
 
 from __future__ import annotations
 
@@ -21,8 +21,6 @@ from shared.dataset.loader import (
 
 MODEL_NAMES: tuple[str, ...] = (
     "xgboost",
-    "random_forest",
-    "gru",
     "arima",
 )
 BENCHMARK_SYMBOL = "ACB"
@@ -147,26 +145,6 @@ MODEL_REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
         "random_state",
         "feature_list",
     ),
-    "random_forest": (
-        "n_estimators",
-        "max_depth",
-        "min_samples_split",
-        "min_samples_leaf",
-        "random_state",
-        "feature_list",
-    ),
-    "gru": (
-        "sequence_length",
-        "hidden_size",
-        "num_layers",
-        "dropout",
-        "batch_size",
-        "learning_rate",
-        "patience",
-        "max_epochs",
-        "input_size",
-        "feature_list",
-    ),
     "arima": (
         "order_p",
         "order_d",
@@ -178,8 +156,6 @@ MODEL_REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
 }
 MINIMUM_SOURCE_COMMITS: dict[str, str] = {
     "xgboost": "de996d7778f90b119b2497bd66b5f1f71f6186b0",
-    "random_forest": "0989aee0d668bf7876decef033e62df7415ec295",
-    "gru": "8a0d2dd3ec7a749aec2fedd8516e835390a9243d",
     "arima": "ab1cf9af355211192c923c55aa042ff0413fdf6a",
 }
 SOURCE_SUMMARY_STATUSES: frozenset[str] = frozenset({"preliminary", "valid", "invalid"})

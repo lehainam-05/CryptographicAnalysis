@@ -28,7 +28,7 @@ set -euo pipefail
 COMPOSE="${COMPOSE:-docker compose -f docker-compose.prod.yml}"
 BOOTSTRAP_SERIES="${BOOTSTRAP_SERIES:-ACB:1d FPT:1d HPG:1d VCB:1d VNM:1d BTCUSDT:1d ETHUSDT:1d SOLUSDT:1d BTCUSDT:1h}"
 BOOTSTRAP_SEED="${BOOTSTRAP_SEED:-42}"
-MODELS="arima xgboost random_forest gru"
+MODELS="arima xgboost"
 SNAPSHOT_DIR="data/snapshots/ohlcv_full_current"
 SKIP_TRAIN=false
 [[ "${1:-}" == "--skip-train" ]] && SKIP_TRAIN=true

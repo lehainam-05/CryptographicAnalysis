@@ -1,4 +1,4 @@
-"""Validate and rank four explicit MLflow runs for the locked ACB 1d benchmark."""
+"""Validate and rank two explicit MLflow runs for the locked ACB 1d benchmark."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
-BENCHMARK_EXPERIMENT = "ACB_1d_four_model_benchmark"
+BENCHMARK_EXPERIMENT = "ACB_1d_two_model_benchmark"
 OUTPUT_FILENAMES: tuple[str, ...] = (
     "benchmark_overview.csv",
     "benchmark_report.md",
@@ -55,14 +55,6 @@ REQUIRED_ARTIFACTS: dict[str, tuple[str, ...]] = {
     "xgboost": (
         "model/MLmodel",
         "preprocessing/standard_scaler.joblib",
-    ),
-    "random_forest": ("model/MLmodel",),
-    "gru": (
-        "model/MLmodel",
-        "model_state/gru_state_dict.pt",
-        "preprocessing/feature_scaler.joblib",
-        "preprocessing/target_scaler.joblib",
-        "metadata/reproducibility.json",
     ),
     "arima": (
         "model/MLmodel",
@@ -155,7 +147,7 @@ class BenchmarkResult:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse four explicit run IDs and the generated-artifact output directory."""
+    """Parse two explicit run IDs and the generated-artifact output directory."""
     parser = argparse.ArgumentParser(description=__doc__)
     for model in MODEL_NAMES:
         option = f"--{model.replace('_', '-')}-run-id"
@@ -170,7 +162,7 @@ def explicit_run_ids(args: argparse.Namespace) -> dict[str, str]:
         model: str(getattr(args, f"{model}_run_id")).strip() for model in MODEL_NAMES
     }
     if any(not run_id for run_id in mapping.values()):
-        raise BenchmarkValidationError("All four explicit run IDs are required.")
+        raise BenchmarkValidationError("All two explicit run IDs are required.")
     if len(set(mapping.values())) != len(MODEL_NAMES):
         raise BenchmarkValidationError("Each model must use a distinct MLflow run ID.")
     return mapping
@@ -718,10 +710,6 @@ def validate_model_artifact(
     try:
         if evaluation.model == "xgboost":
             _validate_xgboost_artifact(evaluation, client, download_root)
-        elif evaluation.model == "random_forest":
-            _validate_random_forest_artifact(evaluation)
-        elif evaluation.model == "gru":
-            _validate_gru_artifact(evaluation, client, download_root)
         elif evaluation.model == "arima":
             _validate_arima_artifact(evaluation, client, download_root)
     except Exception as exc:
@@ -783,104 +771,6 @@ def _validate_xgboost_artifact(
             "finite_prediction": bool(np.isfinite(prediction).all()),
         },
         "XGBoost model, scaler, or feature ordering is inconsistent.",
-    )
-
-
-def _validate_random_forest_artifact(evaluation: ModelEvaluation) -> None:
-    """Reload Random Forest and verify feature-aware finite prediction."""
-    import mlflow.sklearn
-
-    model = mlflow.sklearn.load_model(f"runs:/{evaluation.run_id}/model")
-    features = _feature_names(evaluation)
-    sample = pd.DataFrame(np.zeros((1, len(features))), columns=features)
-    prediction = np.asarray(model.predict(sample), dtype=np.float64)
-    artifact_features = list(getattr(model, "feature_names_in_", []))
-    passed = bool(
-        prediction.shape == (1,)
-        and np.isfinite(prediction).all()
-        and int(model.n_features_in_) == len(features)
-        and artifact_features == features
-    )
-    evaluation.record(
-        "model_artifact_reload",
-        passed,
-        {"features": features, "finite_prediction": True},
-        {
-            "features": artifact_features,
-            "finite_prediction": bool(np.isfinite(prediction).all()),
-        },
-        "Random Forest model or feature ordering is inconsistent.",
-    )
-
-
-def _validate_gru_artifact(
-    evaluation: ModelEvaluation,
-    client: Any,
-    download_root: Path,
-) -> None:
-    """Reload GRU, strict state dict, both scalers, and architecture metadata."""
-    import mlflow.pytorch
-    import torch
-
-    model = mlflow.pytorch.load_model(
-        f"runs:/{evaluation.run_id}/model",
-        map_location="cpu",
-    )
-    state_path = _download_artifact(
-        client, evaluation.run_id, "model_state/gru_state_dict.pt", download_root
-    )
-    feature_scaler = joblib.load(
-        _download_artifact(
-            client,
-            evaluation.run_id,
-            "preprocessing/feature_scaler.joblib",
-            download_root,
-        )
-    )
-    target_scaler = joblib.load(
-        _download_artifact(
-            client,
-            evaluation.run_id,
-            "preprocessing/target_scaler.joblib",
-            download_root,
-        )
-    )
-    metadata_path = _download_artifact(
-        client, evaluation.run_id, "metadata/reproducibility.json", download_root
-    )
-    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    state = torch.load(state_path, map_location="cpu", weights_only=True)
-    incompatible = model.load_state_dict(state, strict=True)
-    sequence_length = int(evaluation.params["sequence_length"])
-    input_size = int(evaluation.params["input_size"])
-    with torch.no_grad():
-        prediction = model(torch.zeros((1, sequence_length, input_size))).numpy()
-    config = metadata.get("config", {})
-    architecture_names = tuple(
-        name for name in MODEL_REQUIRED_PARAMS["gru"] if name != "feature_list"
-    )
-    passed = bool(
-        not incompatible.missing_keys
-        and not incompatible.unexpected_keys
-        and np.isfinite(prediction).all()
-        and int(feature_scaler.n_features_in_) == input_size
-        and int(target_scaler.n_features_in_) == 1
-        and all(name in config for name in architecture_names)
-        and all(
-            str(config[name]) == str(evaluation.params[name])
-            for name in architecture_names
-        )
-    )
-    evaluation.record(
-        "model_artifact_reload",
-        passed,
-        "strict GRU state, matching metadata/scalers, finite prediction",
-        {
-            "strict": not incompatible.missing_keys
-            and not incompatible.unexpected_keys,
-            "finite_prediction": bool(np.isfinite(prediction).all()),
-        },
-        "GRU state, metadata, scaler, or prediction validation failed.",
     )
 
 
@@ -1064,17 +954,17 @@ def finalize_eligibility(
         evaluation.status = "invalid" if evaluation.failure_reasons else "excluded"
         if not evaluation.failure_reasons:
             evaluation.record(
-                "complete_four_model_benchmark",
+                "complete_two_model_benchmark",
                 False,
-                "four valid runs",
+                "two valid runs",
                 "another model failed",
-                "Run excluded because the four-model benchmark is incomplete.",
+                "Run excluded because the two-model benchmark is incomplete.",
             )
     return False
 
 
 def _validate_naive_identity(evaluations: dict[str, ModelEvaluation]) -> bool:
-    """Require all four recomputed Naive metrics to match within protocol tolerance."""
+    """Require all two recomputed Naive metrics to match within protocol tolerance."""
     baseline = evaluations[MODEL_NAMES[0]].recomputed_metrics
     naive_names = tuple(name for name in METRIC_NAMES if name.startswith("naive_"))
     all_match = True
@@ -1107,7 +997,7 @@ def rank_valid_models(
     if set(evaluations) != set(MODEL_NAMES) or any(
         evaluation.status != "valid" for evaluation in evaluations.values()
     ):
-        raise BenchmarkValidationError("Final ranking requires four valid models.")
+        raise BenchmarkValidationError("Final ranking requires two valid models.")
     return sorted(
         evaluations.values(),
         key=lambda item: (
@@ -1188,7 +1078,7 @@ def build_audit_payload(
             model: evaluations[model].source_commit for model in MODEL_NAMES
         },
         "checks": {
-            "four_models_valid": all(
+            "two_models_valid": all(
                 evaluation.status == "valid" for evaluation in evaluations.values()
             ),
             "cross_model_row_identity": all(
@@ -1266,7 +1156,7 @@ def render_report(
 ) -> str:
     """Render the required human-readable benchmark report from validated data."""
     lines = [
-        "# ACB 1d Four-Model Benchmark",
+        "# ACB 1d Two-Model Benchmark",
         "",
         f"- Generated at: `{generated_at}`",
         f"- Evaluator source commit: `{evaluator_commit}`",
@@ -1309,7 +1199,7 @@ def render_report(
             "## Exclusions",
             "",
             (
-                "None among the four explicitly selected official runs."
+                "None among the two explicitly selected official runs."
                 if not excluded
                 else "; ".join(
                     f"`{item.model}`: {', '.join(item.failure_reasons)}"
@@ -1355,7 +1245,7 @@ def render_report(
             "## Conclusion",
             "",
             (
-                "Issue #20 benchmark gates passed for all four official runs; "
+                "Issue #20 benchmark gates passed for all two official runs; "
                 "the result is ready for PR review and post-merge verification."
                 if ranking
                 else "Issue #20 remains open because no official ranking was produced."
@@ -1514,7 +1404,7 @@ def log_benchmark_evidence(
     init_mlflow()
     mlflow.set_experiment(BENCHMARK_EXPERIMENT)
     params: dict[str, Any] = {
-        "benchmark": "acb_1d_four_model",
+        "benchmark": "acb_1d_two_model",
         **contract.as_dict(),
         "test_manifest_sha256": manifest_hash,
         **{f"{model}_run_id": evaluations[model].run_id for model in MODEL_NAMES},
@@ -1524,7 +1414,7 @@ def log_benchmark_evidence(
         "evaluator_source_commit": evaluator_commit,
         "workflow": "single-contributor",
     }
-    with mlflow.start_run(run_name="acb_1d_four_model_evaluator") as run:
+    with mlflow.start_run(run_name="acb_1d_two_model_evaluator") as run:
         mlflow.log_params(params)
         mlflow.set_tags(
             {

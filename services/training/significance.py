@@ -44,7 +44,7 @@ DATASETS: tuple[tuple[str, str], ...] = (
     ("SOLUSDT", "1d"),
     ("BTCUSDT", "1h"),
 )
-MODELS: tuple[str, ...] = ("arima", "xgboost", "random_forest", "gru")
+MODELS: tuple[str, ...] = ("arima", "xgboost")
 LOSSES: tuple[str, ...] = ("squared", "absolute")
 ALPHA = 0.05
 

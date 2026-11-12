@@ -24,9 +24,9 @@ export default function AnalysisChart({ points, timeframe }: { points: Indicator
     itemStyle: { color: (p.macd_hist ?? 0) >= 0 ? palette.up : palette.down },
   }));
 
-  // Pane layout (percent of height): price 0–46, volume 50–60, RSI 65–78, MACD 83–94.
+  // Pane layout (percent of height): price 9–46 (legend and axis name above it), volume 50–60, RSI 65–78, MACD 83–94.
   const grids = [
-    { left: 64, right: 24, top: "4%", height: "42%" },
+    { left: 64, right: 24, top: "9%", height: "37%" },
     { left: 64, right: 24, top: "50%", height: "10%" },
     { left: 64, right: 24, top: "65%", height: "13%" },
     { left: 64, right: 24, top: "83%", height: "11%" },
@@ -57,9 +57,14 @@ export default function AnalysisChart({ points, timeframe }: { points: Indicator
     backgroundColor: "transparent",
     animation: false,
     legend: {
+      type: "scroll",
       top: 0,
+      left: 64,
       right: 24,
       textStyle: { color: palette.inkSecondary, fontSize: 11 },
+      pageIconColor: palette.inkSecondary,
+      pageIconInactiveColor: palette.line,
+      pageTextStyle: { color: palette.inkMuted },
       data: ["Nến OHLC", "SMA 20", "SMA 50", "RSI 14", "MACD", "Signal"],
     },
     tooltip: { trigger: "axis", axisPointer: { type: "cross" }, ...CHART_THEME.tooltip },

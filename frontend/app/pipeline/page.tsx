@@ -79,7 +79,7 @@ export default function PipelinePage() {
 function SourcesPanel() {
   return (
     <Panel title="1. Nguồn dữ liệu & lịch thu thập tự động" subtitle="Celery Beat lập lịch → Celery worker gọi adapter của từng nguồn → ghi ops.job_log" bodyClassName="overflow-x-auto">
-      <table className="data-table">
+      <table className="data-table min-w-[880px]">
         <thead>
           <tr>
             <th>Nguồn</th>
@@ -130,7 +130,7 @@ function ScalingPanel() {
     <Panel title="3. Chuẩn hóa dữ liệu trước khi đưa vào mô hình" subtitle="Chuẩn hóa nằm trong pipeline huấn luyện của từng mô hình, không ghi đè dữ liệu gốc">
       <div className="space-y-4">
         <div className="overflow-x-auto">
-          <table className="data-table">
+          <table className="data-table min-w-[480px]">
             <thead>
               <tr>
                 <th>Mô hình</th>

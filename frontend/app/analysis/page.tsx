@@ -229,7 +229,7 @@ function StatsTable({
                 <td className="text-right font-mono">{formatPrice(s.lowest_low, s.asset_class)}</td>
                 <td className="text-right font-mono">{formatPrice(s.highest_high, s.asset_class)}</td>
                 <td className="text-right font-mono">
-                  {formatPrice(s.mean_close, s.asset_class)} <span className="text-slate-500">± {formatNum(s.std_close)}</span>
+                  {formatPrice(s.mean_close, s.asset_class)} <span className="text-slate-400">± {formatNum(s.std_close)}</span>
                 </td>
                 <td className="text-right font-mono text-white">{formatPrice(s.last_close, s.asset_class)}</td>
                 <td className={`text-right font-mono ${(s.change_pct ?? 0) >= 0 ? "text-up" : "text-down"}`}>{formatPct(s.change_pct)}</td>

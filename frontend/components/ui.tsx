@@ -82,10 +82,10 @@ export function StateBox({
   const Icon = kind === "loading" ? Loader2 : kind === "error" ? AlertCircle : Inbox;
   const color = kind === "error" ? "text-down" : kind === "loading" ? "text-accentSoft" : "text-slate-500";
   return (
-    <div className={`flex ${height} w-full flex-col items-center justify-center gap-2 px-6 text-center`}>
-      <Icon className={`h-7 w-7 ${color} ${kind === "loading" ? "animate-spin" : ""}`} />
+    <div role={kind === "error" ? "alert" : "status"} className={`flex ${height} w-full flex-col items-center justify-center gap-2 px-6 text-center`}>
+      <Icon className={`h-7 w-7 ${color} ${kind === "loading" ? "animate-spin" : ""}`} aria-hidden />
       <span className={`text-sm ${kind === "error" ? "font-semibold text-down" : "text-slate-300"}`}>{message}</span>
-      {hint && <span className="max-w-lg text-xs text-slate-500">{hint}</span>}
+      {hint && <span className="max-w-lg text-xs text-slate-400">{hint}</span>}
       {onRetry && (
         <button onClick={onRetry} className="btn-secondary mt-1">
           <RotateCw className="h-3.5 w-3.5" /> Thử lại

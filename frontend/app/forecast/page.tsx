@@ -208,7 +208,7 @@ function ChartPanel(props: {
       actions={<ForecastLegend assetClass={assetClass} />}
       bodyClassName="flex flex-col gap-3 p-4"
     >
-      {forecastError && <div className="rounded border border-down/40 bg-down/10 px-3 py-2 text-sm text-rose-200">{forecastError}</div>}
+      {forecastError && <div role="alert" className="rounded border border-down/40 bg-down/10 px-3 py-2 text-sm text-rose-200">{forecastError}</div>}
       <div className="h-[460px] md:h-[560px] xl:h-[620px]">
         {loading ? (
           <StateBox kind="loading" message={`Đang tải dữ liệu ${ticker}…`} height="h-full" />

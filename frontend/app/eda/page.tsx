@@ -132,8 +132,8 @@ function DistributionChart({ dist }: { dist: ReturnDistribution }) {
   const option = {
     backgroundColor: "transparent",
     tooltip: { trigger: "axis", ...tooltip },
-    legend: { data: ["Thực tế", "Phân phối chuẩn"], textStyle: LEGEND_TEXT, top: 0 },
-    grid: { left: 8, right: 16, top: 32, bottom: 8, containLabel: true },
+    legend: { data: ["Thực tế", "Phân phối chuẩn"], textStyle: LEGEND_TEXT, type: "scroll", top: 0 },
+    grid: { left: 8, right: 16, top: 52, bottom: 8, containLabel: true },
     xAxis: categoryAxis(labels, { name: "Lợi suất ngày", nameLocation: "middle", nameGap: 28, nameTextStyle: { color: NEUTRAL } }),
     yAxis: valueAxis("Số phiên"),
     series: [
@@ -189,8 +189,8 @@ function CumulativeChart({ data, ticker }: { data: EdaResponse; ticker: string }
   const option = {
     backgroundColor: "transparent",
     tooltip: { trigger: "axis", ...tooltip },
-    legend: { textStyle: LEGEND_TEXT, top: 0 },
-    grid: { left: 8, right: 16, top: 32, bottom: 8, containLabel: true },
+    legend: { textStyle: LEGEND_TEXT, type: "scroll", top: 0 },
+    grid: { left: 8, right: 16, top: 52, bottom: 8, containLabel: true },
     xAxis: categoryAxis(data.cumulative_dates, { boundaryGap: false }),
     yAxis: { ...valueAxis("Chỉ số (gốc 100)"), scale: true },
     series,
@@ -301,8 +301,8 @@ function WeekdayChart({ data }: { data: EdaResponse }) {
   const option = {
     backgroundColor: "transparent",
     tooltip: { trigger: "axis", ...tooltip, valueFormatter: (v: number | null) => (v === null ? "—" : `${v}%`) },
-    legend: { textStyle: LEGEND_TEXT, top: 0 },
-    grid: { left: 8, right: 16, top: 32, bottom: 8, containLabel: true },
+    legend: { textStyle: LEGEND_TEXT, type: "scroll", top: 0 },
+    grid: { left: 8, right: 16, top: 52, bottom: 8, containLabel: true },
     xAxis: categoryAxis(data.weekday_labels),
     yAxis: valueAxis("%"),
     series: (["stock", "crypto"] as const).map((m) => ({

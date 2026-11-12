@@ -76,6 +76,19 @@ body {
   .nav-link[data-active="true"] {
     @apply text-white;
   }
+
+  /* Phone nav: the link row scrolls sideways without a scrollbar; the right edge
+     fades while more links are hidden there (a scroll cue, not a surface effect). */
+  .nav-scroll {
+    scrollbar-width: none;
+  }
+  .nav-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .nav-scroll-more {
+    mask-image: linear-gradient(to right, #000 80%, transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 80%, transparent);
+  }
 }
 
 ::-webkit-scrollbar {

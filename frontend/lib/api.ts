@@ -276,6 +276,40 @@ export function fetchDataQuality(timeframe: Timeframe): Promise<DataQualityRepor
 }
 
 /** GET /api/v1/jobs — most recent ingestion/cleaning jobs (ops.job_log). */
+export interface ReturnDistribution {
+  ticker: string;
+  asset_class: string;
+  n: number;
+  bin_centers: number[];
+  counts: number[];
+  normal_counts: number[];
+  mean: number | null;
+  std: number | null;
+  skew: number | null;
+  excess_kurtosis: number | null;
+  annualized_volatility: number | null;
+}
+
+/** GET /api/v1/eda — every 2-D array is ordered like `tickers`. */
+export interface EdaResponse {
+  tickers: string[];
+  asset_classes: string[];
+  distributions: ReturnDistribution[];
+  correlation: (number | null)[][];
+  correlation_days: number;
+  cumulative_dates: string[];
+  cumulative: (number | null)[][];
+  coverage_months: string[];
+  coverage: number[][];
+  weekday_labels: string[];
+  weekday_mean_return: { stock: (number | null)[]; crypto: (number | null)[] };
+  hourly_mean_return: (number | null)[];
+}
+
+export function fetchEda(): Promise<EdaResponse> {
+  return request<EdaResponse>("/api/v1/eda");
+}
+
 export function fetchJobs(limit: number = 20): Promise<JobLogEntry[]> {
   return request<JobLogEntry[]>(`/api/v1/jobs?${new URLSearchParams({ limit: String(limit) })}`);
 }

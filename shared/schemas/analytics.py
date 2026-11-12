@@ -114,3 +114,54 @@ class JobLogEntry(BaseModel):
     duration_ms: Optional[int] = None
     rows_affected: Optional[int] = None
     error_message: Optional[str] = None
+
+
+class ReturnDistribution(BaseModel):
+    """Histogram of daily simple returns of one ticker plus its normal fit."""
+
+    ticker: str
+    asset_class: str
+    n: int
+    bin_centers: List[float]
+    counts: List[int]
+    normal_counts: List[float] = Field(
+        ..., description="Số quan sát kỳ vọng nếu lợi suất phân phối chuẩn"
+    )
+    mean: Optional[float] = None
+    std: Optional[float] = None
+    skew: Optional[float] = None
+    excess_kurtosis: Optional[float] = Field(
+        None,
+        description="Độ nhọn vượt chuẩn; > 0 nghĩa là đuôi dày hơn phân phối chuẩn",
+    )
+    annualized_volatility: Optional[float] = None
+
+
+class EdaResponse(BaseModel):
+    """Exploratory analysis over all active tickers (daily bars)."""
+
+    tickers: List[str]
+    asset_classes: List[str]
+    distributions: List[ReturnDistribution]
+    correlation: List[List[Optional[float]]] = Field(
+        ..., description="Ma trận tương quan lợi suất ngày, thứ tự theo `tickers`"
+    )
+    correlation_days: int = Field(
+        ..., description="Số ngày chung (mọi mã đều có giá) dùng để tính tương quan"
+    )
+    cumulative_dates: List[str]
+    cumulative: List[List[Optional[float]]] = Field(
+        ..., description="Giá chuẩn hóa về 100 tại ngày chung đầu tiên, mỗi dòng 1 mã"
+    )
+    coverage_months: List[str]
+    coverage: List[List[int]] = Field(
+        ..., description="Số nến mỗi tháng, mỗi dòng 1 mã"
+    )
+    weekday_labels: List[str]
+    weekday_mean_return: dict[str, List[Optional[float]]] = Field(
+        ..., description="Lợi suất trung bình theo thứ, theo nhóm stock/crypto"
+    )
+    hourly_mean_return: List[Optional[float]] = Field(
+        ...,
+        description="Lợi suất 1 giờ trung bình theo giờ trong ngày (giờ VN), crypto",
+    )

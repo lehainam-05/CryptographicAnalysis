@@ -37,6 +37,8 @@ from shared.schemas.predict import (
 )
 from shared.schemas.analytics import (
     DataQualityReport,
+    EdaResponse,
+    ReturnDistribution,
     IndicatorPoint,
     IndicatorResponse,
     JobLogEntry,
@@ -46,6 +48,7 @@ from shared.schemas.analytics import (
 
 # Local imports
 from analytics import INDICATOR_WARMUP_BARS, compute_indicators, profile_quality
+import eda
 from model_loader import (
     LoadedModel,
     ModelLoadError,
@@ -862,3 +865,97 @@ def get_recent_jobs(
         {"limit": limit},
     )
     return [JobLogEntry(**dict(row._mapping)) for row in rows]
+
+
+# ==============================================================================
+# Exploratory data analysis (Khám phá dữ liệu)
+# ==============================================================================
+
+EDA_DAILY_SQL = text(
+    "SELECT s.ticker, s.asset_class::text AS asset_class, o.ts, o.close "
+    "FROM market.ohlcv o JOIN market.symbol s ON s.id = o.symbol_id "
+    "WHERE o.timeframe = '1d' AND s.status = 'active' ORDER BY s.ticker, o.ts"
+)
+EDA_HOURLY_SQL = text(
+    "SELECT s.ticker, o.ts, o.close "
+    "FROM market.ohlcv o JOIN market.symbol s ON s.id = o.symbol_id "
+    "WHERE o.timeframe = '1h' AND s.asset_class = 'crypto' AND s.status = 'active' "
+    "ORDER BY s.ticker, o.ts"
+)
+
+
+def _rows_to_frame(rows: list, columns: list[str]) -> pd.DataFrame:
+    """Turn SQL rows into a frame with float close and tz-aware ts."""
+    frame = pd.DataFrame([tuple(row) for row in rows], columns=columns)
+    if not frame.empty:
+        frame["ts"] = pd.to_datetime(frame["ts"], utc=True)
+        frame["close"] = frame["close"].astype(float)
+    return frame
+
+
+def _matrix_to_lists(frame: pd.DataFrame) -> List[List[Optional[float]]]:
+    """Rows of a numeric frame as JSON-safe lists (NaN -> None)."""
+    return [
+        [None if pd.isna(value) else float(value) for value in row]
+        for row in frame.to_numpy()
+    ]
+
+
+@app.get(
+    "/api/v1/eda",
+    response_model=EdaResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+def get_eda(db: Session = Depends(get_db)) -> EdaResponse:
+    """
+    Khám phá dữ liệu trên nến ngày của mọi mã: phân phối lợi suất, ma trận
+    tương quan, lợi suất tích lũy (chuẩn hóa 100), độ biến động năm, độ phủ dữ
+    liệu theo tháng và tính mùa vụ (theo thứ; theo giờ với crypto 1h).
+    """
+    # shortcut: recomputed on every request (~1 s on 25 tickers); cache in Redis if it gets slow.
+    daily = _rows_to_frame(
+        _fetch_rows(db, EDA_DAILY_SQL, {}), ["ticker", "asset_class", "ts", "close"]
+    )
+    if daily.empty:
+        raise HTTPException(status_code=404, detail="No daily data available.")
+    hourly = _rows_to_frame(
+        _fetch_rows(db, EDA_HOURLY_SQL, {}), ["ticker", "ts", "close"]
+    )
+
+    asset_class = daily.groupby("ticker")["asset_class"].first().to_dict()
+    tickers = sorted(asset_class, key=lambda t: (asset_class[t], t))
+    closes = eda.close_matrix(daily)[tickers]
+    returns = eda.daily_returns(closes)
+    volatility = eda.annualized_volatility(returns, asset_class)
+    correlation = eda.correlation_matrix(closes).reindex(index=tickers, columns=tickers)
+    cumulative = eda.cumulative_index(closes)
+    coverage = eda.monthly_coverage(closes)
+    by_class = {
+        cls: [t for t in tickers if asset_class[t] == cls]
+        for cls in ("stock", "crypto")
+    }
+    return EdaResponse(
+        tickers=tickers,
+        asset_classes=[asset_class[t] for t in tickers],
+        distributions=[
+            ReturnDistribution(
+                ticker=t,
+                asset_class=asset_class[t],
+                annualized_volatility=volatility[t],
+                **eda.return_distribution(returns[t]),
+            )
+            for t in tickers
+        ],
+        correlation=_matrix_to_lists(correlation),
+        correlation_days=int(len(closes.dropna(how="any"))),
+        cumulative_dates=[d.strftime("%Y-%m-%d") for d in cumulative.index],
+        cumulative=_matrix_to_lists(cumulative.T),
+        coverage_months=list(coverage.index),
+        coverage=coverage.T.to_numpy().tolist(),
+        weekday_labels=list(eda.WEEKDAY_LABELS),
+        weekday_mean_return={
+            cls: eda.weekday_mean_returns(returns, members) if members else []
+            for cls, members in by_class.items()
+        },
+        hourly_mean_return=eda.hourly_mean_returns(hourly),
+    )

@@ -372,7 +372,29 @@ liệu ở khung thời gian được chọn. Dùng cho bảng thông số ở t
     duration_ms, rows_affected, error_message`.
 *   `status` thuộc enum `ops.job_status`: `pending | running | success | failed | skipped`.
 
-Các endpoint 8–11 yêu cầu `X-API-Key`, trả `503` nếu cơ sở dữ liệu lỗi.
+## 11b. GET /api/v1/eda — Khám phá dữ liệu (EDA)
+
+*   **Query**: không có. Dùng nến `1d` của mọi mã đang hoạt động, riêng phân
+    tích theo giờ dùng nến `1h` của crypto.
+*   **Response** (`EdaResponse`, mọi mảng 2 chiều theo thứ tự `tickers`):
+    *   `distributions[]`: histogram lợi suất ngày (`bin_centers`, `counts`),
+        `normal_counts` (số quan sát kỳ vọng nếu phân phối chuẩn), `mean`, `std`,
+        `skew`, `excess_kurtosis`, `annualized_volatility` (std × √252 cổ phiếu,
+        × √365 crypto).
+    *   `correlation` + `correlation_days`: tương quan Pearson của lợi suất ngày,
+        chỉ tính trên các ngày mọi mã đều có giá, để không ghép lợi suất cổ
+        phiếu (thứ 6 → thứ 2) với lợi suất crypto khác kỳ hạn.
+    *   `cumulative_dates`, `cumulative`: giá chuẩn hóa về 100 tại ngày chung
+        đầu tiên; ngày cổ phiếu nghỉ để `null`, không điền giá trị.
+    *   `coverage_months`, `coverage`: số nến mỗi tháng của mỗi mã.
+    *   `weekday_labels`, `weekday_mean_return.{stock,crypto}`: lợi suất trung
+        bình theo thứ (giờ Việt Nam); `hourly_mean_return`: lợi suất 1 giờ trung
+        bình theo giờ trong ngày (giờ Việt Nam, 24 giá trị).
+*   Công thức nằm trong `services/inference/eda.py` (pandas thuần, có test tại
+    `services/inference/tests/test_eda.py`).
+*   **Mã lỗi**: `404` khi chưa có nến ngày nào.
+
+Các endpoint 8–11b yêu cầu `X-API-Key`, trả `503` nếu cơ sở dữ liệu lỗi.
 
 ---
 

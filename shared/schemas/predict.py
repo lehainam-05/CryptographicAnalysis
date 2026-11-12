@@ -9,9 +9,7 @@ ALLOWED_TIMEFRAMES = ("1d", "1h")
 
 class PredictRequest(BaseModel):
     ticker_id: str = Field(..., description="Mã tài sản, ví dụ: FPT hoặc BTCUSDT")
-    model_name: str = Field(
-        ..., description="Tên mô hình: arima, xgboost"
-    )
+    model_name: str = Field(..., description="Tên mô hình: arima, xgboost")
     steps: int = Field(5, ge=1, le=30, description="Số bước cần dự báo về tương lai")
     timeframe: Optional[str] = Field(
         None,

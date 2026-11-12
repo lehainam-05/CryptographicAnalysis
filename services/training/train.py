@@ -320,7 +320,6 @@ def run_pipeline() -> None:
         trained_model = xgb_wrapper.model
         preds = xgb_wrapper.predict(X_test)
 
-
     # ------------------------------------------------------------------
     # 6. Evaluate
     # ------------------------------------------------------------------

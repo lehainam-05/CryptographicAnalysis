@@ -657,8 +657,7 @@ def _rank_evaluations() -> dict[str, benchmark.ModelEvaluation]:
 def test_ranking_uses_rmse_mae_and_directional_accuracy() -> None:
     ranking = benchmark.rank_valid_models(_rank_evaluations())
     _expect(
-        [evaluation.model for evaluation in ranking]
-        == ["arima", "xgboost"],
+        [evaluation.model for evaluation in ranking] == ["arima", "xgboost"],
         "Protocol ranking order is incorrect",
     )
 

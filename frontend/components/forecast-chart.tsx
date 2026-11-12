@@ -8,11 +8,17 @@ export interface PricePoint {
   value: number;
 }
 
+/** Market colour of the actual-price line (DESIGN.md: one market, one colour). */
+export function marketColor(assetClass: string): string {
+  return assetClass === "crypto" ? palette.crypto : palette.stock;
+}
+
 /**
- * "Biểu đồ dự đoán" from the mockup: actual close as a solid blue line and
- * the model forecast as a dashed amber line that starts at the last close.
+ * Actual close as a solid line in the market's colour and the model forecast
+ * as a dashed Forecast Amber line that starts at the last close.
  */
-export default function ForecastChart({ history, forecast }: { history: PricePoint[]; forecast: PricePoint[] }) {
+export default function ForecastChart({ history, forecast, assetClass }: { history: PricePoint[]; forecast: PricePoint[]; assetClass: string }) {
+  const color = marketColor(assetClass);
   const labels = [...history.map((p) => p.label), ...forecast.map((p) => p.label)];
   const actual = [...history.map((p) => p.value), ...forecast.map(() => null)];
   const predicted: (number | null)[] = history.map(() => null);
@@ -42,7 +48,7 @@ export default function ForecastChart({ history, forecast }: { history: PricePoi
     },
     dataZoom: [
       { type: "inside", start: 55, end: 100 },
-      { type: "slider", start: 55, end: 100, bottom: 16, height: 22, textStyle: { color: palette.inkMuted }, borderColor: "#475569" },
+      { type: "slider", start: 55, end: 100, bottom: 16, height: 22, textStyle: { color: palette.inkMuted }, borderColor: palette.line },
     ],
     series: [
       {
@@ -50,12 +56,12 @@ export default function ForecastChart({ history, forecast }: { history: PricePoi
         type: "line",
         data: actual,
         showSymbol: false,
-        lineStyle: { color: palette.stock, width: 2 },
-        itemStyle: { color: palette.stock },
-        areaStyle: { color: "rgba(59,130,246,0.08)" },
+        lineStyle: { color, width: 2 },
+        itemStyle: { color },
+        areaStyle: { color: `${color}14` },
       },
       {
-        name: "Giá AI dự báo",
+        name: "Giá dự báo",
         type: "line",
         data: predicted,
         showSymbol: true,
@@ -70,15 +76,15 @@ export default function ForecastChart({ history, forecast }: { history: PricePoi
   return <EChart option={option} notMerge style={{ height: "100%", width: "100%" }} />;
 }
 
-/** HTML legend identical to the mockup's `.legend` block. */
-export function ForecastLegend() {
+/** HTML legend: actual line in the market colour, forecast dashed amber. */
+export function ForecastLegend({ assetClass }: { assetClass: string }) {
   return (
-    <div className="flex w-fit items-center gap-5 rounded-lg bg-inset px-4 py-3 text-sm text-slate-300">
+    <div className="flex w-fit flex-wrap items-center gap-x-5 gap-y-2 rounded-lg bg-inset px-4 py-2.5 text-sm text-slate-300">
       <span className="flex items-center gap-2">
-        <span className="inline-block h-[3px] w-7 rounded bg-accentSoft" /> Giá thực tế
+        <span className="inline-block h-[3px] w-7 rounded" style={{ background: marketColor(assetClass) }} aria-hidden /> Giá thực tế
       </span>
       <span className="flex items-center gap-2">
-        <span className="inline-block w-7 border-t-[3px] border-dashed border-forecast" /> Giá AI dự báo
+        <span className="inline-block w-7 border-t-[3px] border-dashed border-forecast" aria-hidden /> Giá dự báo
       </span>
     </div>
   );

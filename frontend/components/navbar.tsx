@@ -9,7 +9,7 @@ const LINKS = [
   { href: "/", label: "Tổng quan" },
   { href: "/analysis", label: "Dữ liệu & Phân tích" },
   { href: "/eda", label: "Khám phá dữ liệu" },
-  { href: "/forecast", label: "Dự báo AI" },
+  { href: "/forecast", label: "Dự báo" },
   { href: "/explainability", label: "Giải thích mô hình" },
   { href: "/pipeline", label: "Thu thập & Làm sạch" },
 ];

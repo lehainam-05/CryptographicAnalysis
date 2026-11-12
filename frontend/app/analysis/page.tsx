@@ -90,7 +90,7 @@ export default function AnalysisPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dữ liệu & Phân tích"
-        description="Bảng thông số thống kê của dữ liệu đã làm sạch và dashboard phân tích biến động giá theo thời gian: nến OHLC, đường trung bình động, khối lượng, RSI và MACD."
+        description="Thống kê mô tả của dữ liệu đã làm sạch cho từng mã, rồi biểu đồ kỹ thuật của một mã: nến OHLC, đường trung bình động, khối lượng, RSI và MACD."
       />
 
       <FilterBar>
@@ -131,18 +131,23 @@ export default function AnalysisPage() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
         <Panel
-          title={`Biểu đồ phân tích kỹ thuật — ${ticker || "…"} (${timeframeLabel(timeframe)})`}
-          subtitle="Cuộn chuột hoặc kéo thanh trượt để phóng to một giai đoạn; bốn tầng dùng chung trục thời gian."
-          bodyClassName="h-[760px] p-3"
+          title={`2. Biểu đồ kỹ thuật — ${ticker || "…"} (${timeframeLabel(timeframe)})`}
+          subtitle="Nến + SMA 20/50 · khối lượng · RSI 14 · MACD (12, 26, 9) · cuộn chuột hoặc kéo thanh trượt để phóng to"
+          bodyClassName="p-3"
         >
-          {chartLoading ? (
-            <StateBox kind="loading" message={`Đang tải dữ liệu ${ticker}…`} height="h-full" />
-          ) : chartError ? (
-            <StateBox kind="error" message="Không tải được dữ liệu biểu đồ" hint={chartError} onRetry={loadChart} height="h-full" />
-          ) : points.length === 0 ? (
-            <StateBox kind="empty" message="Chưa chọn mã hoặc chưa có dữ liệu" height="h-full" />
-          ) : (
-            <AnalysisChart points={points} timeframe={timeframe} />
+          <div className="h-[600px] md:h-[760px]">
+            {chartLoading ? (
+              <StateBox kind="loading" message={`Đang tải dữ liệu ${ticker}…`} height="h-full" />
+            ) : chartError ? (
+              <StateBox kind="error" message="Không tải được dữ liệu biểu đồ" hint={chartError} onRetry={loadChart} height="h-full" />
+            ) : points.length === 0 ? (
+              <StateBox kind="empty" message="Chưa chọn mã hoặc chưa có dữ liệu" height="h-full" />
+            ) : (
+              <AnalysisChart points={points} timeframe={timeframe} />
+            )}
+          </div>
+          {!chartLoading && !chartError && points.length > 1 && (
+            <WindowReading points={points} assetClass={selected?.asset_class ?? "stock"} timeframe={timeframe} ticker={ticker} />
           )}
         </Panel>
         <IndicatorSidebar points={points} stats={selected} timeframe={timeframe} />
@@ -172,8 +177,8 @@ function StatsTable({
 }) {
   return (
     <Panel
-      title={`Bảng thông số dữ liệu (khung ${timeframeLabel(timeframe)})`}
-      subtitle="Thống kê mô tả trên toàn bộ dữ liệu đã làm sạch trong market.ohlcv; RSI/MACD tại nến gần nhất · bấm một dòng để xem biểu đồ"
+      title={`1. Thống kê mô tả từng mã (khung ${timeframeLabel(timeframe)})`}
+      subtitle="Trên toàn bộ dữ liệu đã làm sạch; RSI/MACD tại nến gần nhất · cổ phiếu VN tính bằng nghìn đồng, crypto bằng USDT · chọn một dòng để xem biểu đồ"
       bodyClassName="max-h-[440px] overflow-auto"
     >
       {loading ? (
@@ -207,14 +212,22 @@ function StatsTable({
               <tr
                 key={s.ticker}
                 onClick={() => onSelect(s.ticker)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelect(s.ticker);
+                  }
+                }}
+                tabIndex={0}
+                aria-selected={s.ticker === selected}
                 className={`cursor-pointer ${s.ticker === selected ? "!bg-accent/15" : ""}`}
               >
                 <td className="font-bold text-white">{s.ticker}</td>
                 <td><AssetBadge assetClass={s.asset_class} /></td>
                 <td className="text-right font-mono">{formatNum(s.bars, 0)}</td>
                 <td className="text-slate-400">{formatDate(s.first_ts)} – {formatDate(s.last_ts)}</td>
-                <td className="text-right font-mono text-down">{formatPrice(s.lowest_low, s.asset_class)}</td>
-                <td className="text-right font-mono text-up">{formatPrice(s.highest_high, s.asset_class)}</td>
+                <td className="text-right font-mono">{formatPrice(s.lowest_low, s.asset_class)}</td>
+                <td className="text-right font-mono">{formatPrice(s.highest_high, s.asset_class)}</td>
                 <td className="text-right font-mono">
                   {formatPrice(s.mean_close, s.asset_class)} <span className="text-slate-500">± {formatNum(s.std_close)}</span>
                 </td>
@@ -242,9 +255,6 @@ function IndicatorSidebar({ points, stats, timeframe }: { points: IndicatorPoint
   const last = points[points.length - 1];
   const assetClass = stats?.asset_class ?? "stock";
   const insights = readIndicators(points);
-  const high = points.length ? Math.max(...points.map((p) => p.high)) : null;
-  const low = points.length ? Math.min(...points.map((p) => p.low)) : null;
-  const change = points.length > 1 ? (points[points.length - 1].close / points[0].close - 1) * 100 : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -256,27 +266,17 @@ function IndicatorSidebar({ points, stats, timeframe }: { points: IndicatorPoint
         <MetricRow label="MACD / Signal" value={`${formatNum(last?.macd, 3)} / ${formatNum(last?.macd_signal, 3)}`} />
       </Panel>
 
-      <Panel title="Trong cửa sổ đang xem" bodyClassName="flex flex-col gap-2.5 p-4">
-        <MetricRow label="Cao nhất" value={formatPrice(high, assetClass)} />
-        <MetricRow label="Thấp nhất" value={formatPrice(low, assetClass)} />
-        <MetricRow
-          label="Thay đổi"
-          value={<span className={(change ?? 0) >= 0 ? "text-up" : "text-down"}>{formatPct(change)}</span>}
-          note={`${points.length} nến`}
-        />
-      </Panel>
-
-      <Panel title="Diễn giải tự động" bodyClassName="p-4">
+      <Panel title="Diễn giải theo quy tắc" subtitle="Mỗi câu ứng với một quy tắc SMA, RSI hoặc MACD" bodyClassName="p-4">
         {insights.length === 0 ? (
           <p className="text-sm text-slate-400">Chưa đủ dữ liệu để diễn giải.</p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="list-disc space-y-2 pl-4 text-sm leading-relaxed">
             {insights.map((item) => (
-              <li key={item.text} className={TONE_CLASS[item.tone]}>• {item.text}</li>
+              <li key={item.text} className={TONE_CLASS[item.tone]}>{item.text}</li>
             ))}
           </ul>
         )}
-        <p className="mt-3 text-[11px] text-slate-500">Quy tắc phân tích kỹ thuật cơ bản, chỉ mang tính minh họa — không phải khuyến nghị đầu tư.</p>
+        <p className="mt-3 text-xs text-slate-400">Quy tắc phân tích kỹ thuật cơ bản, chỉ mang tính minh họa — không phải khuyến nghị đầu tư.</p>
       </Panel>
     </div>
   );
@@ -286,7 +286,7 @@ function RecentTable({ points, timeframe, assetClass }: { points: IndicatorPoint
   if (points.length === 0) return null;
   const rows = [...points].reverse().slice(0, RECENT_ROWS);
   return (
-    <Panel title={`Dữ liệu lịch sử — ${RECENT_ROWS} nến gần nhất`} subtitle="Giá OHLCV đã làm sạch kèm chỉ báo, mới nhất trước" bodyClassName="max-h-[520px] overflow-auto">
+    <Panel title={`3. Dữ liệu gần nhất — ${RECENT_ROWS} nến`} subtitle="Giá OHLCV đã làm sạch kèm chỉ báo, mới nhất ở trên · màu giá đóng: xanh khi đóng ≥ mở, đỏ khi đóng < mở" bodyClassName="max-h-[520px] overflow-auto">
       <table className="data-table whitespace-nowrap">
         <thead className="sticky top-0">
           <tr>
@@ -306,8 +306,8 @@ function RecentTable({ points, timeframe, assetClass }: { points: IndicatorPoint
             <tr key={p.ts}>
               <td className="font-mono text-xs text-slate-400">{formatDate(p.ts, timeframe === "1h")}</td>
               <td className="text-right font-mono">{formatPrice(p.open, assetClass)}</td>
-              <td className="text-right font-mono text-up">{formatPrice(p.high, assetClass)}</td>
-              <td className="text-right font-mono text-down">{formatPrice(p.low, assetClass)}</td>
+              <td className="text-right font-mono">{formatPrice(p.high, assetClass)}</td>
+              <td className="text-right font-mono">{formatPrice(p.low, assetClass)}</td>
               <td className={`text-right font-mono font-semibold ${p.close >= p.open ? "text-up" : "text-down"}`}>{formatPrice(p.close, assetClass)}</td>
               <td className="text-right font-mono">{formatVolume(p.volume)}</td>
               <td className="text-right font-mono">{formatPrice(p.sma_20, assetClass)}</td>
@@ -318,5 +318,25 @@ function RecentTable({ points, timeframe, assetClass }: { points: IndicatorPoint
         </tbody>
       </table>
     </Panel>
+  );
+}
+
+/** One-line reading of the visible window, printed under the chart (DESIGN.md: a note under every chart). */
+function WindowReading({ points, assetClass, timeframe, ticker }: { points: IndicatorPoint[]; assetClass: string; timeframe: Timeframe; ticker: string }) {
+  const first = points[0];
+  const last = points[points.length - 1];
+  const high = Math.max(...points.map((p) => p.high));
+  const low = Math.min(...points.map((p) => p.low));
+  const change = (last.close / first.close - 1) * 100;
+  const intraday = timeframe === "1h";
+  return (
+    <p className="border-t border-line px-2 pt-3 text-sm leading-relaxed text-slate-300">
+      Từ {formatDate(first.ts, intraday)} đến {formatDate(last.ts, intraday)} ({points.length} nến), {ticker} đi từ{" "}
+      <span className="font-mono text-white">{formatPrice(first.close, assetClass)}</span> đến{" "}
+      <span className="font-mono text-white">{formatPrice(last.close, assetClass)}</span> (
+      <span className={`font-mono ${change >= 0 ? "text-up" : "text-down"}`}>{formatPct(change)}</span>), dao động trong biên{" "}
+      <span className="font-mono text-white">{formatPrice(low, assetClass)}</span> –{" "}
+      <span className="font-mono text-white">{formatPrice(high, assetClass)}</span>.
+    </p>
   );
 }

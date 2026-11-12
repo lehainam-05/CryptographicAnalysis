@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Navbar />
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-5 py-6">{children}</main>
         <footer className="border-t border-line bg-panel py-4 text-center text-xs text-slate-400">
-          Đồ án Nghiên cứu khoa học — Hệ thống thu thập, phân tích &amp; dự báo giá cổ phiếu VN và tiền mã hóa
+          Bài tập lớn Phân tích &amp; Trực quan hóa dữ liệu — Hệ thống thu thập, phân tích &amp; dự báo giá cổ phiếu VN và tiền mã hóa
         </footer>
       </body>
     </html>

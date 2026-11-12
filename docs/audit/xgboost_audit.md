@@ -142,7 +142,7 @@ Evidence: [`xgboost_features.py:138-196`](file:///D:/sources/repos/NCKH/services
 ### 5.4 Cross-model Naive identity enforcement
 
 - [`_validate_test_alignment`](file:///D:/sources/repos/NCKH/services/training/train_xgboost.py#L656-L664): assert model test targets = manifest targets
-- Benchmark [`_validate_naive_identity`](file:///D:/sources/repos/NCKH/services/training/benchmark.py#L1076-L1100): yêu cầu cả 4 model có cùng Naive metrics (tolerance $10^{-12}$)
+- Benchmark [`_validate_naive_identity`](file:///D:/sources/repos/NCKH/services/training/benchmark.py#L1076-L1100): yêu cầu các model có cùng Naive metrics (tolerance $10^{-12}$)
 - Manifest locked bằng SHA-256: `62d82e13...`
 
 > **Kết luận: CÓ — Test set HOÀN TOÀN GIỐNG nhau cho Model và Naive. Enforced bằng cryptographic hash.**
@@ -243,7 +243,7 @@ Pipeline **đúng về mặt kỹ thuật**:
 
 #### 7.2.2 Bản chất khó ngoại suy (extrapolation) của tree-based models
 
-- **Quan sát:** XGBoost (và Random Forest) là tree-based model — chúng **không có khả năng ngoại suy** ngoài phạm vi giá trị đã thấy trong training data. Nếu test set có giá nằm ngoài khoảng min–max của train, model sẽ trả về giá trị gần nhất nó biết, không phải giá đúng.
+- **Quan sát:** XGBoost là tree-based model — chúng **không có khả năng ngoại suy** ngoài phạm vi giá trị đã thấy trong training data. Nếu test set có giá nằm ngoài khoảng min–max của train, model sẽ trả về giá trị gần nhất nó biết, không phải giá đúng.
 - **Evidence:** XGBoost objective = `reg:squarederror` ([dòng 276](file:///D:/sources/repos/NCKH/services/training/train_xgboost.py#L276)), predict bằng `model.predict(X)` ([`xgboost_model.py:70-72`](file:///D:/sources/repos/NCKH/services/training/models/xgboost_model.py#L70-L72)).
 - **Cần xác nhận:** So `min/max(close)` giữa train và test để biết extrapolation có xảy ra thật không (xem mục 7.3 #2).
 - **Ghi chú:** Đây là hạn chế cố hữu của tree-based method khi dự đoán raw price — không phải bug trong pipeline.
@@ -271,7 +271,7 @@ Pipeline **đúng về mặt kỹ thuật**:
 ### 7.3 Ưu tiên hành động (chờ duyệt nhóm, KHÔNG tự ý thực hiện)
 
 > [!CAUTION]
-> Mục #3 (đổi target) là thay đổi cấp `group_dataset` — ảnh hưởng toàn bộ 4 model,
+> Mục #3 (đổi target) là thay đổi cấp `group_dataset` — ảnh hưởng cả hai model,
 > PHẢI bàn với leader và cả nhóm trước khi thực hiện. Xem mục 7.4.
 
 | # | Việc | Effort | Lý do |
@@ -288,10 +288,8 @@ Pipeline **đúng về mặt kỹ thuật**:
 > [!IMPORTANT]
 > Các finding dưới đây KHÔNG chỉ riêng XGBoost — cần bàn với nhóm trước khi hành động.
 
-- **Random Forest:** Cũng tree-based, cũng target `next_close` → dính đúng root cause 7.2.1 (raw price) + 7.2.2 (extrapolation). Khả năng cao cùng cơ chế khiến RF thua Naive (improvement = −63.20%).
-- **GRU:** Neural network có khả năng ngoại suy hơn tree, nhưng vẫn dự đoán raw price → 7.2.1 vẫn áp dụng. Improvement = −88.63%, kém nhất → có thể do overfitting trên dataset nhỏ.
 - **ARIMA:** Duy nhất thắng Naive (+0.52%) vì ARIMA(1,1,1) với differencing ($d = 1$) thực chất đã model hóa return ngầm. Lợi thế nhỏ này nhất quán với giả thuyết rằng target raw price bất lợi cho model không có built-in differencing.
-- **Quyết định đổi target** (mục 7.3 #3) nằm ở cấp `configs/group_dataset.json` → thay đổi `target.mode` ảnh hưởng hàm `_add_split_and_target` trong `shared/dataset/loader.py`, tức **tất cả 4 model đều bị ảnh hưởng**. Đây là quyết định nhóm, không phải cá nhân.
+- **Quyết định đổi target** (mục 7.3 #3) nằm ở cấp `configs/group_dataset.json` → thay đổi `target.mode` ảnh hưởng hàm `_add_split_and_target` trong `shared/dataset/loader.py`, tức **cả hai model đều bị ảnh hưởng**. Đây là quyết định nhóm, không phải cá nhân.
 
 ---
 

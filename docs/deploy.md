@@ -80,7 +80,7 @@ bash scripts/prod_bootstrap.sh
 ```
 
 Script lần lượt: nạp snapshot → kiểm tra hợp đồng dữ liệu → nối dữ liệu crypto từ
-cuối snapshot tới hiện tại → train 4 mô hình cho 9 chuỗi và đăng ký vào MLflow →
+cuối snapshot tới hiện tại → train 2 mô hình (ARIMA, XGBoost) cho 9 chuỗi và đăng ký vào MLflow →
 khởi động lại inference. Dùng `--skip-train` để bỏ bước train; đặt
 `BOOTSTRAP_SERIES="ACB:1d BTCUSDT:1h"` để train ít chuỗi hơn.
 
@@ -143,7 +143,7 @@ API mở cho mọi người.
 - `prod_bootstrap.sh`: nạp snapshot (fingerprint khớp), nối crypto 10 mã tới
   17/10 (1h: khoảng 2.399 nến/mã, 1d: 101 nến/mã), train và đăng ký đủ 36 model.
 - Qua nginx, không gửi khóa: 5 màn hình tải dữ liệu thật; `/predict` và
-  `/explain` của cả 4 mô hình trả 200; bấm "Tiến hành dự báo" trên giao diện chạy được.
+  `/explain` của các mô hình trả 200; bấm "Tiến hành dự báo" trên giao diện chạy được.
 - Khóa API thật không có trong `.next/` của frontend.
 - Inference thấy IP người gọi (không phải IP nginx); `X-Forwarded-For` do client
   tự gửi bị bỏ qua.

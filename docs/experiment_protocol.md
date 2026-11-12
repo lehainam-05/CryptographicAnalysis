@@ -2,8 +2,8 @@
 
 ## 1. Mục đích và phạm vi
 
-Tài liệu này là protocol bắt buộc để so sánh công bằng bốn mô hình `xgboost`,
-`random_forest`, `gru` và `arima`. Mọi kết quả trước khi tuân thủ đầy đủ
+Tài liệu này là protocol bắt buộc để so sánh công bằng hai mô hình `xgboost`
+và `arima`. Mọi kết quả trước khi tuân thủ đầy đủ
 protocol chỉ được xem là `preliminary` và không được dùng để xếp hạng chính
 thức.
 
@@ -63,7 +63,7 @@ Không model nào được:
 
 Mỗi run phải tạo hoặc sử dụng cùng một test manifest cho cùng `symbol` và
 `timeframe`. Manifest là nguồn sự thật duy nhất cho thứ tự target,
-`current_close` và `actual_close`. Bốn model phải dùng cùng số target và cùng
+`current_close` và `actual_close`. Hai model phải dùng cùng số target và cùng
 thứ tự target.
 
 Manifest có chính xác các cột theo thứ tự:
@@ -92,7 +92,7 @@ dataset_version,snapshot_name,symbol,timeframe,split,input_ts,target_ts,current_
 - Tất cả timestamp phải được chuyển sang UTC và serialize bằng ISO-8601.
 - Mọi trường bắt buộc phải có giá trị; dữ liệu số không được chứa `NaN`, `Inf`
   hoặc `-Inf`.
-- Bốn model phải đối chiếu manifest trước khi predict; không được cắt manifest
+- Hai model phải đối chiếu manifest trước khi predict; không được cắt manifest
   theo model có ít prediction nhất.
 
 ## 4. `test_manifest_sha256`
@@ -132,11 +132,9 @@ Mỗi run phải xuất một prediction-level CSV với chính xác các cột 
 dataset_version,snapshot_name,test_manifest_sha256,symbol,timeframe,model,split,input_ts,target_ts,current_close,actual_close,predicted_close,run_id,seed
 ```
 
-Tên model chuẩn chỉ nhận một trong bốn giá trị:
+Tên model chuẩn chỉ nhận một trong hai giá trị:
 
 - `xgboost`
-- `random_forest`
-- `gru`
 - `arima`
 
 Quy tắc bắt buộc:
@@ -300,10 +298,10 @@ loại im lặng dòng lỗi để làm run hợp lệ.
 1. Dùng `group_dataset_v1`, snapshot `ohlcv_full_current`, target `next_close`,
    horizon 1 và seed 42.
 2. Khóa test manifest và `test_manifest_sha256`.
-3. Chạy đủ `xgboost`, `random_forest`, `gru` và `arima` trên cùng manifest.
+3. Chạy đủ `xgboost` và `arima` trên cùng manifest.
 4. Kiểm tra toàn bộ quality gate, đặc biệt alignment timestamp, số target và
    Naive metrics.
-5. Chỉ đánh dấu pilot ACB 1d hợp lệ khi cả bốn run đều `valid`.
+5. Chỉ đánh dấu pilot ACB 1d hợp lệ khi cả hai run đều `valid`.
 
 ### Giai đoạn B — BTCUSDT 1h
 
@@ -312,7 +310,8 @@ hash, prediction, metric và quality gate phải được lặp lại không tha
 
 > **Ghi chú trạng thái (cập nhật 26/07/2026, không thay đổi protocol):**
 >
-> - Giai đoạn A (ACB 1d) đã hoàn tất: evaluator chạy 23/07/2026, cả bốn run
+> - Giai đoạn A (ACB 1d) đã hoàn tất trong đồ án NCKH gốc (benchmark bốn
+>   mô hình): evaluator chạy 23/07/2026, mọi run
 >   `valid`, merge vào `develop` qua PR #32, Issue #20 đã đóng 24/07/2026.
 >   Bằng chứng: `docs/evidence/ACB_1d/`.
 > - Giai đoạn B (BTCUSDT 1h) CHƯA chạy. Khi thực hiện, theo đúng protocol
@@ -320,18 +319,14 @@ hash, prediction, metric và quality gate phải được lặp lại không tha
 >
 >   ```bash
 >   python -m services.training.train_xgboost --ticker BTCUSDT --timeframe 1h
->   python -m services.training.train_random_forest --ticker BTCUSDT --timeframe 1h
->   python -m services.training.train_gru --ticker BTCUSDT --timeframe 1h
 >   python -m services.training.train_arima --ticker BTCUSDT --timeframe 1h
 >   python -m services.training.benchmark \
 >     --xgboost-run-id <run_id> \
->     --random-forest-run-id <run_id> \
->     --gru-run-id <run_id> \
 >     --arima-run-id <run_id> \
 >     --output-dir artifacts/benchmarks/BTCUSDT_1h
 >   ```
 >
->   Bốn `<run_id>` là MLflow run ID của bốn run official trên cùng manifest;
+>   Hai `<run_id>` là MLflow run ID của hai run official trên cùng manifest;
 >   toàn bộ quality gate ở mục 8 áp dụng nguyên vẹn.
 
 ## 10. Bằng chứng bắt buộc cho mỗi run
@@ -356,8 +351,6 @@ command hoặc test output.
 Tài liệu và protocol dùng chung cần toàn bộ nhóm modeling review:
 
 - Nguyễn Văn Kiên — XGBoost;
-- Lê Hải Nam — Random Forest;
-- Nguyễn Trọng Đại — GRU;
 - Đỗ Quang Hà — ARIMA.
 
 Trước khi bàn giao issue #15:

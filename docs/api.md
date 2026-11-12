@@ -75,14 +75,11 @@ Lấy dự báo giá cho một mã tài sản trong N bước thời gian tiếp
 | Trường | Kiểu | Bắt buộc | Mặc định | Mô tả |
 | :--- | :--- | :--- | :--- | :--- |
 | `ticker_id` | String | Đúng | | Mã định danh tài sản (ví dụ: `ACB`, `FPT`, `BTCUSDT`) |
-| `model_name` | String | Đúng | | Một trong: `arima`, `xgboost`, `random_forest`, `gru` |
+| `model_name` | String | Đúng | | Một trong: `arima`, `xgboost` |
 | `steps` | Integer | Sai | `5` | Số bước dự báo về tương lai, hợp lệ `1..30` |
 | `timeframe` | String | Sai | Suy ra từ `asset_class` | `"1d"` hoặc `"1h"`. Nếu bỏ trống: stock → `1d`, crypto → `1h` |
 
-> Ghi chú chuyển tiếp: schema hiện tại (`shared/schemas/predict.py`) còn chấp
-> nhận `lstm` (di sản cũ, LSTM đã bị loại khỏi phạm vi đề tài) và chưa nhận
-> `random_forest` / `timeframe`. PR backend song song sẽ chốt danh sách model
-> đúng bốn mô hình của đề tài như bảng trên.
+> Các tên model khác (`gru`, `random_forest`, `lstm`) bị từ chối với `422`.
 
 **Ví dụ Request Body**:
 
@@ -259,8 +256,7 @@ trường `method`:
 
 | `model_name` | `method` | Ý nghĩa của `importance` | Trường bổ sung |
 | :--- | :--- | :--- | :--- |
-| `xgboost`, `random_forest` | `shap_tree_explainer` | Độ quan trọng của cây (gain / impurity) | `mean_abs_shap`: trung bình \|SHAP\| trên tập test |
-| `gru` | `permutation_importance` | RMSE tăng thêm (đơn vị giá) khi xáo trộn feature trên tập test | `importance_std`; cấp response: `baseline_rmse`, `n_repeats`, `n_samples` |
+| `xgboost` | `shap_tree_explainer` | Độ quan trọng của cây (gain / impurity) | `mean_abs_shap`: trung bình \|SHAP\| trên tập test |
 | `arima` | `arima_coefficients` | \|hệ số\| của tham số ARIMA (ARIMA chỉ dùng giá đóng cửa nên không có feature để xếp hạng) | `coefficient` (có dấu), `std_error`, `p_value` (có thể `null`); cấp response: `order`, `n_observations` |
 
 Các trường bổ sung đều tùy chọn: artifact cũ chỉ có `importance`/`mean_abs_shap`
@@ -276,11 +272,11 @@ vẫn đọc được.
 | :--- | :--- | :--- | :--- | :--- |
 | `ticker` | String | Đúng | | Mã tài sản |
 | `timeframe` | String | Sai | `1d` | Khung thời gian |
-| `model_name` | String | Sai | `xgboost` | `xgboost`, `random_forest`, `gru`, `arima` |
+| `model_name` | String | Sai | `xgboost` | `xgboost`, `arima` |
 
 ### Response (JSON - 200 OK)
 
-**Ví dụ — XGBoost / Random Forest**:
+**Ví dụ — XGBoost**:
 
 ```json
 {
@@ -294,24 +290,6 @@ vẫn đọc được.
   ],
   "generated_at": "2026-07-26T09:20:00Z",
   "n_samples": 78
-}
-```
-
-**Ví dụ — GRU**:
-
-```json
-{
-  "ticker": "ACB",
-  "timeframe": "1d",
-  "model_name": "gru",
-  "method": "permutation_importance",
-  "features": [
-    {"feature": "close", "importance": 1.204, "importance_std": 0.083},
-    {"feature": "return_1d", "importance": -0.002, "importance_std": 0.004}
-  ],
-  "baseline_rmse": 0.387,
-  "n_repeats": 5,
-  "n_samples": 71
 }
 ```
 

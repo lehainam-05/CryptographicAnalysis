@@ -1,6 +1,6 @@
 # Hệ Thống Thu Thập, Phân Tích Trực Quan & Dự Báo Giá Cổ Phiếu & Tiền Số
 
-Hệ thống tự động thu thập dữ liệu giá từ **thị trường chứng khoán Việt Nam** (vnstock) và **thị trường tiền mã hóa** (Binance), lưu trữ hiệu năng cao bằng **TimescaleDB**, huấn luyện các mô hình dự báo chuỗi thời gian (**ARIMA, XGBoost, Random Forest, GRU**), quản lý vòng đời mô hình bằng **MLflow** và hiển thị trực quan thông qua ứng dụng **Next.js & ECharts** kết hợp giải thích mô hình bằng **SHAP**.
+Hệ thống tự động thu thập dữ liệu giá từ **thị trường chứng khoán Việt Nam** (vnstock) và **thị trường tiền mã hóa** (Binance), lưu trữ hiệu năng cao bằng **TimescaleDB**, huấn luyện các mô hình dự báo chuỗi thời gian (**ARIMA, XGBoost**, so với baseline Naive), quản lý vòng đời mô hình bằng **MLflow** và hiển thị trực quan thông qua ứng dụng **Next.js & ECharts** kết hợp giải thích mô hình bằng **SHAP**.
 
 ---
 
@@ -24,7 +24,7 @@ Hệ thống tự động thu thập dữ liệu giá từ **thị trường ch�
 | **Backend** | Python 3.11 + FastAPI (Kiến trúc đa dịch vụ) |
 | **Database** | PostgreSQL 16 + TimescaleDB (Hypertable cho chuỗi thời gian) |
 | **Task Queue** | Redis + Celery & Celery Beat |
-| **ML / DL** | Statsmodels (ARIMA), XGBoost, scikit-learn (Random Forest), PyTorch (GRU), Optuna, MLflow |
+| **ML** | Statsmodels (ARIMA), XGBoost, scikit-learn, Optuna, MLflow |
 | **Giải thích mô hình** | SHAP (SHapley Additive exPlanations) |
 | **Frontend** | React 18 + Next.js (App Router, TypeScript) + Apache ECharts |
 | **DevOps & CI/CD** | Docker & Docker Compose, GitHub Actions, Sentry |
@@ -90,16 +90,11 @@ NCKH/
 │   ├── training/                     # Dịch vụ HUẤN LUYỆN mô hình
 │   │   ├── models/
 │   │   │   ├── arima_model.py        #   ↳ ARIMA baseline (statsmodels)
-│   │   │   ├── gru_model.py          #   ↳ GRU (PyTorch)
-│   │   │   ├── random_forest_features.py # ↳ Feature riêng cho Random Forest
-│   │   │   ├── random_forest_model.py #   ↳ Random Forest (scikit-learn)
 │   │   │   ├── xgboost_features.py   #   ↳ Bộ 19 feature riêng cho XGBoost
 │   │   │   └── xgboost_model.py      #   ↳ XGBoost + SHAP
 │   │   ├── data_loader.py            # Tải & chia dữ liệu cho luồng train.py
 │   │   ├── train.py                  # Entrypoint chung cũ, giữ cho luồng legacy
 │   │   ├── train_xgboost.py          # Entrypoint riêng cho XGBoost
-│   │   ├── train_random_forest.py    # Entrypoint riêng cho Random Forest
-│   │   ├── train_gru.py              # Entrypoint riêng cho GRU
 │   │   ├── train_arima.py            # Entrypoint riêng cho ARIMA
 │   │   ├── evaluate.py               # Đánh giá mô hình (MAE, RMSE, MAPE)
 │   │   ├── mlflow_utils.py           # Tiện ích log MLflow
@@ -280,8 +275,8 @@ python -m services.training.train_xgboost --ticker <ticker> --timeframe <tf> --n
 Thu thập dữ liệu          Feature Engineering         Huấn luyện & Đánh giá
 ┌──────────────┐          ┌──────────────────┐        ┌───────────────────────┐
 │  Binance API │──┐       │  Bộ feature riêng│        │  ARIMA (baseline)     │
-│  vnstock     │──┼──────▶│  theo từng model │───────▶│XGBoost / Random Forest│
-│  Celery Beat │──┘       │  XGBoost: 19     │        │  GRU (PyTorch)        │
+│  vnstock     │──┼──────▶│  theo từng model │───────▶│  XGBoost              │
+│  Celery Beat │──┘       │  XGBoost: 19     │        │  so với Naive         │
 └──────────────┘          └──────────────────┘        └───────────┬───────────┘
                                                                   │
                           ┌──────────────────┐                    │

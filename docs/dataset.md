@@ -55,10 +55,10 @@ công khai của Vietcap (`trading.vietcap.com.vn`, chính là nguồn "VCI" mà
   khác; tránh đổi schema). Gói `vnstock` không còn được dùng.
 - **Không ảnh hưởng thí nghiệm:** huấn luyện đọc snapshot đã khóa (tệp có
   fingerprint), không đọc DB; mô hình demo giữ nguyên như kết quả báo cáo.
-- **Giới hạn:** mô hình cây (XGBoost, Random Forest) dự báo mức giá nên không
+- **Giới hạn:** mô hình cây (XGBoost) dự báo mức giá nên không
   ngoại suy ra ngoài khoảng giá lúc huấn luyện. Ngày 20/10/2026 FPT đóng cửa
-  57,4 (đã điều chỉnh), dưới mức thấp nhất của tập huấn luyện (62,77), và hai
-  mô hình này dự báo khoảng 89–92; ARIMA và GRU vẫn bám giá. Các mã ACB, HPG,
+  57,4 (đã điều chỉnh), dưới mức thấp nhất của tập huấn luyện (62,77), và
+  XGBoost dự báo khoảng 89–92; ARIMA vẫn bám giá. Các mã ACB, HPG,
   VCB, VNM không bị.
 - API không chính thức, có thể đổi hoặc chặn bất cứ lúc nào; khi đó job ghi
   `failed` và dữ liệu đã có được giữ nguyên.
@@ -198,9 +198,8 @@ Hiện có hai cách đọc dữ liệu training cần phân biệt:
   trên và sử dụng dữ liệu trong DB local. Đường này được giữ lại cho tương
   thích; các entrypoint benchmark chính thức KHÔNG dùng đường này.
 - **Cách B — entrypoint snapshot riêng của từng model (chuẩn benchmark):** cả
-  bốn model đều đã có entrypoint độc lập đọc locked snapshot —
-  `train_xgboost.py`, `train_random_forest.py`, `train_gru.py`,
-  `train_arima.py` (thư mục `services/training/`). Mỗi entrypoint gọi
+  hai model đều có entrypoint độc lập đọc locked snapshot —
+  `train_xgboost.py`, `train_arima.py` (thư mục `services/training/`). Mỗi entrypoint gọi
   `assert_locked_dataset()` rồi `load_full()` qua `shared/dataset/loader.py` để
   đọc trực tiếp locked snapshot tại
   `data/snapshots/<source_snapshot_name>/*.csv.gz`, không đọc dữ liệu training từ
@@ -209,8 +208,6 @@ Hiện có hai cách đọc dữ liệu training cần phân biệt:
 
   ```bash
   python -m services.training.train_xgboost --ticker <ticker> --timeframe <tf>
-  python -m services.training.train_random_forest --ticker <ticker> --timeframe <tf>
-  python -m services.training.train_gru --ticker <ticker> --timeframe <tf>
   python -m services.training.train_arima --ticker <ticker> --timeframe <tf>
   ```
 

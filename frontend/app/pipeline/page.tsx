@@ -14,17 +14,17 @@ import {
   type Timeframe,
 } from "@/lib/api";
 import { formatDate, formatNum, timeframeLabel } from "@/lib/format";
-import { AssetBadge, Badge, Field, PageHeader, Panel, StateBox } from "@/components/ui";
+import { AssetBadge, Badge, ChartReading, Field, Num, PageHeader, Panel, StateBox } from "@/components/ui";
 
-/* Mirrors services/ingestion/celery_app.py, app/scheduler.py and app/cleaning.py. */
+/* Mirrors services/ingestion/celery_app.py, adapters/ and app/cleaning.py. */
 const SOURCES = [
   {
-    source: "vnstock (nguồn VCI)",
+    source: "Vietcap (API biểu đồ công khai)",
     market: "Cổ phiếu Việt Nam (HOSE)",
     timeframes: "1 ngày",
     schedule: "Thứ 2–6, 10:00 UTC (17:00 giờ VN), lấy 7 ngày gần nhất",
     symbols: "15 cổ phiếu (INGEST_STOCK_SYMBOLS)",
-    note: "Phụ thuộc tùy chọn: PyPI cách ly gói vnstock từ 09/2026 — khi thiếu, job ghi trạng thái skipped",
+    note: "Gọi thẳng endpoint mà nguồn VCI của vnstock dùng (gói vnstock bị PyPI cách ly từ 09/2026). Giá đã điều chỉnh cổ tức/chia tách, đơn vị nghìn đồng",
   },
   {
     source: "Binance qua thư viện ccxt",
@@ -38,7 +38,7 @@ const SOURCES = [
     source: "Backfill + snapshot khóa",
     market: "Toàn bộ 25 mã",
     timeframes: "1 ngày, 1 giờ",
-    schedule: "Chạy tay: scripts/backfill_all.py, import_dataset_snapshot.py",
+    schedule: "Chạy tay: scripts/backfill_all.py, scripts/import_dataset_snapshot.py",
     symbols: "15 cổ phiếu + 10 crypto",
     note: "Snapshot group_dataset_v1 có fingerprint SHA-256 dùng cho thí nghiệm",
   },
@@ -46,7 +46,7 @@ const SOURCES = [
 
 const CLEANING_STEPS = [
   { title: "Lưu dữ liệu thô", detail: "Mọi nến từ nguồn được ghi nguyên trạng vào market.ohlcv_raw (kèm raw_payload, ingested_at) để truy vết." },
-  { title: "1. Chuẩn hóa múi giờ → UTC", detail: "Binance đã là UTC. vnstock khung ngày giữ nguyên ngày giao dịch; khung trong ngày trừ 7 giờ (giờ VN bị gán nhầm UTC)." },
+  { title: "1. Chuẩn hóa múi giờ → UTC", detail: "Binance đã là UTC. Cổ phiếu khung ngày giữ nguyên ngày giao dịch; nếu có khung trong ngày thì trừ 7 giờ (giờ VN bị gán nhầm UTC)." },
   { title: "2. Loại bản ghi trùng", detail: "Khóa (symbol_id, timeframe, ts); nếu trùng giữ bản có ingested_at mới nhất." },
   { title: "3. Xử lý dữ liệu khuyết", detail: "Cổ phiếu khung ngày: dựng lịch thứ 2–6, forward-fill tối đa 3 phiên liên tiếp (CLEANING_FFILL_LIMIT), phiên điền có volume = 0; khoảng trống dài hơn bị bỏ. Crypto (24/7) không điền — thiếu nến là lỗi nguồn. Chỉ dùng dữ liệu quá khứ, không nhìn trước." },
   { title: "4. Phát hiện nhiễu (outlier)", detail: "Quy tắc IQR: ngoài [Q1 − 1,5·IQR, Q3 + 1,5·IQR] của close/volume theo từng mã → gắn cờ is_outlier, KHÔNG xóa, để người phân tích quyết định." },
@@ -66,7 +66,7 @@ export default function PipelinePage() {
         description="Cách hệ thống thu thập dữ liệu tự động, tổ chức – làm sạch – chuẩn hóa trước khi đưa vào mô hình, và kết quả đo chất lượng dữ liệu thực tế trong cơ sở dữ liệu."
       />
       <SourcesPanel />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1fr]">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_1fr]">
         <CleaningPanel />
         <ScalingPanel />
       </div>
@@ -117,7 +117,7 @@ function CleaningPanel() {
               <div className="font-semibold text-white">{step.title}</div>
               <p className="mt-1 text-sm leading-relaxed text-slate-300">{step.detail}</p>
             </div>
-            {i < CLEANING_STEPS.length - 1 && <ArrowDown className="my-1 h-4 w-4 text-accentSoft" />}
+            {i < CLEANING_STEPS.length - 1 && <ArrowDown className="my-1 h-4 w-4 text-slate-500" aria-hidden />}
           </li>
         ))}
       </ol>
@@ -151,14 +151,14 @@ function ScalingPanel() {
         </div>
         <div className="metric-box space-y-1.5 text-sm text-slate-300">
           <div className="font-semibold text-white">Quy tắc chống rò rỉ dữ liệu (look-ahead)</div>
-          <p>• Chia tập theo thời gian, không xáo trộn: train 70% · validation 15% · test 15%.</p>
-          <p>• Scaler chỉ học (fit) trên tập train; validation/test chỉ được transform.</p>
-          <p>• Mọi đặc trưng (lag, SMA, RSI, MACD…) dùng cửa sổ trượt về quá khứ.</p>
-          <p>• Thí nghiệm đọc snapshot bất biến có fingerprint SHA-256, không đọc DB đang chạy.</p>
+          <ul className="list-disc space-y-1.5 pl-4 leading-relaxed">
+            <li>Chia tập theo thời gian, không xáo trộn: train 70% · validation 15% · test 15%.</li>
+            <li>Scaler chỉ học (fit) trên tập train; validation/test chỉ được transform.</li>
+            <li>Mọi đặc trưng (lag, SMA, RSI, MACD…) dùng cửa sổ trượt về quá khứ.</li>
+            <li>Thí nghiệm đọc snapshot bất biến có fingerprint SHA-256, không đọc DB đang chạy.</li>
+          </ul>
         </div>
-        <p className="text-xs text-slate-500">
-          Z-score: x′ = (x − μ_train) / σ_train · Min-Max: x′ = (x − min_train) / (max_train − min_train)
-        </p>
+        <p className="font-mono text-xs text-slate-400">Z-score: x′ = (x − μ_train) / σ_train</p>
       </div>
     </Panel>
   );
@@ -193,7 +193,7 @@ function QualityPanel() {
       subtitle="Đo trực tiếp trên market.ohlcv; outlier đếm trên lợi suất giữa hai nến liên tiếp (cùng quy tắc IQR k = 1,5)"
       bodyClassName="overflow-x-auto"
       actions={
-        <Field label="" className="min-w-[160px]">
+        <Field label="Khung thời gian" className="min-w-[160px]">
           <select className="field-select" value={timeframe} onChange={(e) => setTimeframe(e.target.value as Timeframe)}>
             <option value="1d">Khung 1 ngày</option>
             <option value="1h">Khung 1 giờ</option>
@@ -231,11 +231,11 @@ function QualityPanel() {
                 <td><AssetBadge assetClass={r.asset_class} /></td>
                 <td className="text-right font-mono">{formatNum(r.bars, 0)}</td>
                 <td className="text-right font-mono text-slate-400">{formatNum(r.expected_bars, 0)}</td>
-                <td className={`text-right font-mono ${r.missing_bars > 0 ? "text-forecast" : ""}`}>{formatNum(r.missing_bars, 0)}</td>
+                <td className="text-right font-mono">{formatNum(r.missing_bars, 0)}</td>
                 <td>
                   <div className="flex items-center gap-2">
-                    <div className="h-2 w-24 overflow-hidden rounded bg-page">
-                      <div className={`h-full ${r.completeness_pct >= 95 ? "bg-up" : "bg-forecast"}`} style={{ width: `${Math.min(r.completeness_pct, 100)}%` }} />
+                    <div className="h-2 w-24 overflow-hidden rounded bg-page" aria-hidden>
+                      <div className="h-full bg-slate-400" style={{ width: `${Math.min(r.completeness_pct, 100)}%` }} />
                     </div>
                     <span className="font-mono text-xs">{formatNum(r.completeness_pct, 1)}%</span>
                   </div>
@@ -248,7 +248,7 @@ function QualityPanel() {
                   {r.last_pipeline_check ? (
                     <PipelineCheckCell check={r.last_pipeline_check} />
                   ) : (
-                    <span className="text-slate-500" title="Dữ liệu nạp bằng import snapshot / backfill, chưa qua clean_and_store_task">
+                    <span className="text-slate-400" title="Dữ liệu nạp bằng import snapshot / backfill, chưa qua clean_and_store_task">
                       Chưa chạy pipeline làm sạch
                     </span>
                   )}
@@ -258,10 +258,13 @@ function QualityPanel() {
           </tbody>
         </table>
       )}
-      <p className="px-5 py-3 text-xs text-slate-500">
-        Nến kỳ vọng tính theo lịch thứ 2–6 cho cổ phiếu (chưa trừ ngày lễ Việt Nam, nên ngày lễ hiện là “thiếu”) và theo lịch liên tục cho crypto.
-        “Đo lại”: chạy lại 4 bước làm sạch trên toàn bộ dữ liệu thô để lấy số liệu (scripts/audit_cleaning.py), không ghi đè dữ liệu đã khóa cho thí nghiệm; outlier ở cột này tính trên mức giá như pipeline gốc.
-      </p>
+      <div className="px-5 pb-4">
+        {!loading && !error && rows.length > 0 && <QualityReading rows={rows} />}
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">
+          Nến kỳ vọng tính theo lịch thứ 2–6 cho cổ phiếu (chưa trừ ngày lễ Việt Nam, nên ngày lễ hiện là “thiếu”) và theo lịch liên tục cho crypto.
+          “Đo lại”: chạy lại 4 bước làm sạch trên toàn bộ dữ liệu thô (scripts/audit_cleaning.py), không ghi đè dữ liệu đã khóa cho thí nghiệm.
+        </p>
+      </div>
     </Panel>
   );
 }
@@ -365,5 +368,35 @@ function OperationsPanel() {
         )}
       </div>
     </Panel>
+  );
+}
+
+/** One-line reading of the quality table: completeness per market, broken bars and flagged outliers. */
+function QualityReading({ rows }: { rows: DataQualityReport[] }) {
+  const completeness = (market: string) => {
+    const picked = rows.filter((r) => r.asset_class === market);
+    const bars = picked.reduce((sum, r) => sum + r.bars, 0);
+    const expected = picked.reduce((sum, r) => sum + r.expected_bars, 0);
+    return expected > 0 ? (bars / expected) * 100 : null;
+  };
+  const stock = completeness("stock");
+  const crypto = completeness("crypto");
+  const invalid = rows.reduce((sum, r) => sum + r.invalid_ohlc_bars, 0);
+  const outliers = rows.reduce((sum, r) => sum + r.return_outliers, 0);
+  return (
+    <ChartReading>
+      Độ đầy đủ:{" "}
+      {stock !== null && (
+        <>
+          cổ phiếu VN <Num>{formatNum(stock, 1)}%</Num> (phần thiếu là ngày nghỉ lễ){crypto !== null ? ", " : ""}
+        </>
+      )}
+      {crypto !== null && (
+        <>
+          crypto <Num>{formatNum(crypto, 1)}%</Num>
+        </>
+      )}
+      . <Num>{formatNum(invalid, 0)}</Num> nến có OHLC sai; <Num>{formatNum(outliers, 0)}</Num> lợi suất ngoại lai được gắn cờ để xem xét, không bị xóa.
+    </ChartReading>
   );
 }

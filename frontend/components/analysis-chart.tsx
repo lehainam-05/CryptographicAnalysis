@@ -9,8 +9,9 @@ import palette from "@/lib/palette";
  * Four stacked panes sharing one time axis and one zoom:
  * 1) candlesticks + SMA 20/50, 2) volume, 3) RSI 14 with 30/70 bands,
  * 4) MACD line, signal line and histogram.
- * Indicator colours (DESIGN.md): the fast line is Indicator violet, the slow line
- * is slate; blue stays for controls and amber stays for forecasts.
+ * Line colours (kept from the original chart): fast line (SMA 20, MACD) blue,
+ * slow line (SMA 50, Signal) amber, RSI violet, so each legend entry stays
+ * distinguishable from the grey a hidden series turns.
  */
 export default function AnalysisChart({ points, timeframe }: { points: IndicatorPoint[]; timeframe: string }) {
   const labels = points.map((p) => formatAxisTime(p.ts, timeframe));
@@ -59,7 +60,6 @@ export default function AnalysisChart({ points, timeframe }: { points: Indicator
     legend: {
       type: "scroll",
       top: 0,
-      left: 64,
       right: 24,
       textStyle: { color: palette.inkSecondary, fontSize: 11 },
       pageIconColor: palette.inkSecondary,
@@ -88,8 +88,8 @@ export default function AnalysisChart({ points, timeframe }: { points: Indicator
         data: candles,
         itemStyle: { color: palette.up, color0: palette.down, borderColor: palette.up, borderColor0: palette.down },
       },
-      line("SMA 20", points.map((p) => p.sma_20), palette.indicator, 0),
-      line("SMA 50", points.map((p) => p.sma_50), palette.inkSecondary, 0),
+      line("SMA 20", points.map((p) => p.sma_20), palette.accentSoft, 0),
+      line("SMA 50", points.map((p) => p.sma_50), palette.forecast, 0),
       { name: "Khối lượng", type: "bar", xAxisIndex: 1, yAxisIndex: 1, data: volumes },
       {
         ...line("RSI 14", points.map((p) => p.rsi_14), palette.indicator, 2),
@@ -102,8 +102,8 @@ export default function AnalysisChart({ points, timeframe }: { points: Indicator
         },
       },
       { name: "Histogram", type: "bar", xAxisIndex: 3, yAxisIndex: 3, data: hist },
-      line("MACD", points.map((p) => p.macd), palette.indicator, 3),
-      line("Signal", points.map((p) => p.macd_signal), palette.inkSecondary, 3),
+      line("MACD", points.map((p) => p.macd), palette.accentSoft, 3),
+      line("Signal", points.map((p) => p.macd_signal), palette.forecast, 3),
     ],
   };
 

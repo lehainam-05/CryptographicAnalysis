@@ -19,7 +19,7 @@ import { formatAxisTime, formatDate, formatNum, formatPct, formatPrice, timefram
 import { readIndicators, TONE_CLASS } from "@/lib/insights";
 import { useSymbols } from "@/lib/use-symbols";
 import ForecastChart, { ForecastLegend } from "@/components/forecast-chart";
-import { Badge, Field, FilterBar, MetricRow, PageHeader, Panel, StateBox } from "@/components/ui";
+import { Badge, ChartReading, Field, FilterBar, MetricRow, Num, PageHeader, Panel, StateBox } from "@/components/ui";
 
 const HISTORY_BARS = 120;
 const STEP_OPTIONS = [1, 3, 5, 7, 14, 30];
@@ -117,8 +117,8 @@ export default function ForecastPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Phân tích & Dự báo"
-        description="Chạy mô hình đã huấn luyện và đăng ký trong MLflow Registry trên dữ liệu thật; so sánh sai số với baseline Naive trên cùng tập kiểm thử."
+        title="Dự báo giá"
+        description="Chạy mô hình ARIMA hoặc XGBoost đã huấn luyện (lưu trong MLflow Registry) trên dữ liệu thật, và luôn so sai số với baseline Naive “giá kỳ tới = giá kỳ này” trên cùng tập kiểm thử."
       />
 
       <FilterBar>
@@ -162,6 +162,9 @@ export default function ForecastPage() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_400px] xl:grid-rows-[auto_auto]">
         <ChartPanel
           ticker={ticker}
+          assetClass={assetClass}
+          model={modelName}
+          registry={registry}
           timeframe={timeframe}
           history={history}
           forecast={forecast}
@@ -171,7 +174,7 @@ export default function ForecastPage() {
           onRetry={loadHistory}
         />
         <EvaluationPanel registry={registry} modelsError={modelsError} name={registryName(ticker, timeframe, modelName)} />
-        <SummaryPanel model={modelName} history={history} forecast={forecast} assetClass={assetClass} />
+        <SummaryPanel model={modelName} history={history} />
       </div>
 
       {forecast && <ForecastTable forecast={forecast} lastClose={history[history.length - 1]?.close} assetClass={assetClass} timeframe={timeframe} />}
@@ -182,6 +185,9 @@ export default function ForecastPage() {
 
 function ChartPanel(props: {
   ticker: string;
+  assetClass: string;
+  model: ModelName;
+  registry?: ModelInfo;
   timeframe: Timeframe;
   history: IndicatorPoint[];
   forecast: PredictResponse | null;
@@ -190,21 +196,20 @@ function ChartPanel(props: {
   forecastError: string | null;
   onRetry: () => void;
 }) {
-  const { ticker, timeframe, history, forecast, loading, error, forecastError, onRetry } = props;
+  const { ticker, assetClass, model, registry, timeframe, history, forecast, loading, error, forecastError, onRetry } = props;
   const historyPoints = history.map((p) => ({ label: formatAxisTime(p.ts, timeframe), value: p.close }));
   const forecastPoints = (forecast?.predictions ?? []).map((p) => ({ label: formatAxisTime(p.target_time, timeframe), value: p.predicted_value }));
 
   return (
-    <section className="panel flex flex-col gap-3 p-5 xl:row-span-2">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-[25px] font-bold text-white">Biểu đồ dự đoán</h2>
-          <p className="text-xs text-slate-400">{ticker} · khung {timeframeLabel(timeframe)} · {history.length} nến gần nhất</p>
-        </div>
-        <ForecastLegend />
-      </div>
-      {forecastError && <div className="rounded border border-down/40 bg-down/10 px-3 py-2 text-sm text-rose-200">{forecastError}</div>}
-      <div className="h-[560px] xl:h-[680px]">
+    <Panel
+      className="xl:row-span-2"
+      title={`1. Biểu đồ dự báo — ${ticker || "…"} (${timeframeLabel(timeframe)})`}
+      subtitle={`Giá đóng cửa ${history.length} nến gần nhất · nét đứt: giá dự báo của ${MODEL_INFO[model].name}`}
+      actions={<ForecastLegend assetClass={assetClass} />}
+      bodyClassName="flex flex-col gap-3 p-4"
+    >
+      {forecastError && <div role="alert" className="rounded border border-down/40 bg-down/10 px-3 py-2 text-sm text-rose-200">{forecastError}</div>}
+      <div className="h-[460px] md:h-[560px] xl:h-[620px]">
         {loading ? (
           <StateBox kind="loading" message={`Đang tải dữ liệu ${ticker}…`} height="h-full" />
         ) : error ? (
@@ -212,10 +217,52 @@ function ChartPanel(props: {
         ) : history.length === 0 ? (
           <StateBox kind="empty" message={`Chưa có dữ liệu khung ${timeframeLabel(timeframe)} cho ${ticker || "mã này"}`} height="h-full" />
         ) : (
-          <ForecastChart history={historyPoints} forecast={forecastPoints} />
+          <ForecastChart history={historyPoints} forecast={forecastPoints} assetClass={assetClass} />
         )}
       </div>
-    </section>
+      {!loading && !error && history.length > 0 && (
+        <ForecastReading model={model} ticker={ticker} history={history} forecast={forecast} registry={registry} assetClass={assetClass} timeframe={timeframe} />
+      )}
+    </Panel>
+  );
+}
+
+/** One-line reading under the forecast chart: the forecast move, then the test error against Naive. */
+function ForecastReading(props: {
+  model: ModelName;
+  ticker: string;
+  history: IndicatorPoint[];
+  forecast: PredictResponse | null;
+  registry?: ModelInfo;
+  assetClass: string;
+  timeframe: Timeframe;
+}) {
+  const { model, ticker, history, forecast, registry, assetClass, timeframe } = props;
+  const name = MODEL_INFO[model].name;
+  const lastClose = history[history.length - 1].close;
+  const final = forecast?.predictions[forecast.predictions.length - 1]?.predicted_value;
+  const m = registry?.metrics;
+  const unit = timeframe === "1h" ? "giờ" : "phiên";
+  return (
+    <ChartReading>
+      {forecast && final !== undefined ? (
+        <>
+          {name} dự báo {ticker} đi từ <Num>{formatPrice(lastClose, assetClass)}</Num> đến <Num>{formatPrice(final, assetClass)}</Num> (
+          <Num>{formatPct((final / lastClose - 1) * 100)}</Num>) sau {forecast.predictions.length} {unit}.{" "}
+        </>
+      ) : (
+        <>Bấm “Tiến hành dự báo” để vẽ đường dự báo của {name}. </>
+      )}
+      {m && m.naive_rmse ? (
+        <>
+          Trên tập test, RMSE của {name} là <Num>{formatNum(m.rmse, 4)}</Num> so với Naive <Num>{formatNum(m.naive_rmse, 4)}</Num>:{" "}
+          {m.rmse < m.naive_rmse ? "tốt hơn" : "kém hơn"} <Num>{formatNum(Math.abs(1 - m.rmse / m.naive_rmse) * 100, 1)}%</Num>.
+          {m.rmse >= m.naive_rmse && " Mô hình chưa thắng được cách đoán “giá kỳ tới = giá kỳ này”, nên đường dự báo chỉ mang tính minh họa."}
+        </>
+      ) : (
+        <>Chưa có số liệu test của mô hình này để so với Naive.</>
+      )}
+    </ChartReading>
   );
 }
 
@@ -229,11 +276,7 @@ function vsNaive(model: number, naive: number | null, decimals: number = 4): str
 function EvaluationPanel({ registry, modelsError, name }: { registry?: ModelInfo; modelsError: string | null; name: string }) {
   const m = registry?.metrics;
   return (
-    <section className="panel flex flex-col gap-3 p-5">
-      <div>
-        <h2 className="text-[25px] font-bold text-white">Đánh giá Mô hình</h2>
-        <p className="text-sm text-muted">Trên tập dữ liệu kiểm thử (Test set)</p>
-      </div>
+    <Panel title="2. Sai số trên tập test" subtitle="15% dữ liệu cuối, mô hình chưa từng thấy · thấp hơn là tốt hơn" bodyClassName="flex flex-col gap-2.5 p-4">
       {modelsError ? (
         <p className="text-sm text-down">Không đọc được MLflow Registry: {modelsError}</p>
       ) : !registry ? (
@@ -242,61 +285,60 @@ function EvaluationPanel({ registry, modelsError, name }: { registry?: ModelInfo
         <p className="text-sm text-slate-400">Run huấn luyện không ghi MAE/RMSE/MAPE.</p>
       ) : (
         <>
-          <MetricRow label="Root Mean Sq. Error (RMSE)" value={formatNum(m.rmse, 4)} note={vsNaive(m.rmse, m.naive_rmse)} />
-          <MetricRow label="Mean Absolute Error (MAE)" value={formatNum(m.mae, 4)} note={vsNaive(m.mae, m.naive_mae)} />
+          <MetricRow label="RMSE" value={formatNum(m.rmse, 4)} note={vsNaive(m.rmse, m.naive_rmse)} />
+          <MetricRow label="MAE" value={formatNum(m.mae, 4)} note={vsNaive(m.mae, m.naive_mae)} />
           <MetricRow label="MAPE" value={`${formatNum(m.mape, 3)}%`} note={vsNaive(m.mape, m.naive_mape, 3)} />
           <MetricRow
-            label="Directional accuracy"
+            label="Đúng chiều tăng/giảm"
             value={m.directional_accuracy === null ? "—" : `${formatNum(m.directional_accuracy * 100, 1)}%`}
-            note="Tỷ lệ đoán đúng chiều tăng/giảm"
+            note="Tỷ lệ phiên đoán đúng hướng giá"
           />
-          <p className="text-[11px] text-slate-500">
-            {registry.model_name} · v{registry.version} · cập nhật {formatDate(registry.last_updated)}
+          <p className="text-xs text-slate-400">
+            <span className="font-mono">{registry.model_name}</span> · v{registry.version} · cập nhật {formatDate(registry.last_updated)}
           </p>
         </>
       )}
-    </section>
+    </Panel>
   );
 }
 
-function SummaryPanel({ model, history, forecast, assetClass }: { model: ModelName; history: IndicatorPoint[]; forecast: PredictResponse | null; assetClass: string }) {
+function SummaryPanel({ model, history }: { model: ModelName; history: IndicatorPoint[] }) {
   const info = MODEL_INFO[model];
-  const lastClose = history[history.length - 1]?.close;
-  const finalValue = forecast?.predictions[forecast.predictions.length - 1]?.predicted_value;
-  const move = lastClose && finalValue !== undefined ? (finalValue / lastClose - 1) * 100 : null;
   const insights = readIndicators(history);
 
   return (
-    <section className="panel flex flex-col gap-3 p-5">
-      <h2 className="text-[25px] font-bold text-white">Tóm tắt thuật toán</h2>
+    <Panel title="3. Mô hình & bối cảnh kỹ thuật" bodyClassName="flex flex-col gap-3 p-4">
       <div className="metric-box space-y-2">
         <div className="flex items-center justify-between">
           <span className="font-semibold text-white">{info.name}</span>
           <Badge tone="slate">{info.family}</Badge>
         </div>
         <p className="text-sm leading-relaxed text-slate-300">{info.summary}</p>
-        {info.caveat && <p className="text-xs text-amber-300">Lưu ý: {info.caveat}</p>}
-      </div>
-      <div className="metric-box space-y-2">
-        <h3 className="font-semibold text-white">Phân tích chuyên sâu:</h3>
-        {move !== null && (
-          <p className={`text-sm ${move >= 0 ? "text-up" : "text-down"}`}>
-            • Mô hình dự báo giá {move >= 0 ? "tăng" : "giảm"} {formatPct(Math.abs(move)).replace("+", "")} sau {forecast?.predictions.length} bước
-            (từ {formatPrice(lastClose, assetClass)} → {formatPrice(finalValue, assetClass)}).
+        {info.caveat && (
+          <p className="text-xs text-slate-300">
+            <span className="font-semibold text-white">Lưu ý:</span> {info.caveat}
           </p>
         )}
-        {insights.map((item) => (
-          <p key={item.text} className={`text-sm ${TONE_CLASS[item.tone]}`}>• {item.text}</p>
-        ))}
-        {!forecast && <p className="text-xs text-slate-500">Bấm “Tiến hành dự báo” để thêm nhận định về kết quả dự báo.</p>}
       </div>
-    </section>
+      <div className="metric-box space-y-2">
+        <h3 className="font-semibold text-white">Chỉ báo tại nến gần nhất</h3>
+        {insights.length === 0 ? (
+          <p className="text-sm text-slate-400">Chưa đủ dữ liệu để diễn giải.</p>
+        ) : (
+          <ul className="list-disc space-y-1.5 pl-4 text-sm leading-relaxed">
+            {insights.map((item) => (
+              <li key={item.text} className={TONE_CLASS[item.tone]}>{item.text}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Panel>
   );
 }
 
 function ForecastTable({ forecast, lastClose, assetClass, timeframe }: { forecast: PredictResponse; lastClose?: number; assetClass: string; timeframe: string }) {
   return (
-    <Panel title="Kết quả dự báo chi tiết" subtitle={`Tạo lúc ${formatDate(forecast.prediction_time, true)} · mô hình ${forecast.model_name}`} bodyClassName="overflow-x-auto">
+    <Panel title="4. Kết quả dự báo từng bước" subtitle={`Tạo lúc ${formatDate(forecast.prediction_time, true)} · mô hình ${forecast.model_name}`} bodyClassName="overflow-x-auto">
       <table className="data-table">
         <thead>
           <tr>
@@ -325,11 +367,13 @@ function ComparisonTable({ models, ticker, timeframe }: { models: ModelInfo[]; t
   const rows = MODELS.map((m) => ({ key: m, info: models.find((x) => x.model_name === registryName(ticker, timeframe, m)) }));
   const ratios = rows.map((r) => (r.info?.metrics?.naive_rmse ? r.info.metrics.rmse / r.info.metrics.naive_rmse : null));
   const best = Math.min(...ratios.filter((x): x is number => x !== null));
+  // Naive errors are logged with every run on the same test split; take them from the first trained model.
+  const naive = rows.map((r) => r.info?.metrics).find((m) => m && m.naive_rmse !== null) ?? null;
 
   return (
     <Panel
-      title={`So sánh 4 mô hình — ${ticker} khung ${timeframeLabel(timeframe)}`}
-      subtitle="RMSE/Naive < 1 nghĩa là mô hình tốt hơn dự báo “giá ngày mai = giá hôm nay”"
+      title={`5. So sánh ARIMA, XGBoost và Naive — ${ticker} khung ${timeframeLabel(timeframe)}`}
+      subtitle="Cùng tập test · RMSE / Naive < 1 nghĩa là mô hình tốt hơn cách đoán “giá kỳ tới = giá kỳ này”"
       bodyClassName="overflow-x-auto"
     >
       <table className="data-table whitespace-nowrap">
@@ -352,18 +396,30 @@ function ComparisonTable({ models, ticker, timeframe }: { models: ModelInfo[]; t
             return (
               <tr key={key}>
                 <td className="font-semibold text-white">
-                  {MODEL_INFO[key].name} {ratio !== null && ratio === best && <Badge tone="green">Tốt nhất</Badge>}
+                  {MODEL_INFO[key].name} {ratio !== null && ratio === best && ratio < 1 && <Badge tone="green">Tốt nhất</Badge>}
                 </td>
                 <td className="text-slate-400">{info ? `v${info.version}` : "chưa huấn luyện"}</td>
                 <td className="text-right font-mono">{formatNum(m?.rmse, 4)}</td>
                 <td className="text-right font-mono text-slate-400">{formatNum(m?.naive_rmse, 4)}</td>
-                <td className={`text-right font-mono ${ratio === null ? "" : ratio < 1 ? "text-up" : "text-down"}`}>{formatNum(ratio, 3)}</td>
+                <td className={`text-right font-mono ${ratio !== null && ratio < 1 ? "font-semibold text-white" : ""}`}>{formatNum(ratio, 3)}</td>
                 <td className="text-right font-mono">{formatNum(m?.mae, 4)}</td>
                 <td className="text-right font-mono">{m ? `${formatNum(m.mape, 3)}%` : "—"}</td>
                 <td className="text-right font-mono">{m?.directional_accuracy == null ? "—" : `${formatNum(m.directional_accuracy * 100, 1)}%`}</td>
               </tr>
             );
           })}
+          {naive && (
+            <tr>
+              <td className="text-slate-300">Naive (baseline)</td>
+              <td className="text-slate-400">giá kỳ trước</td>
+              <td className="text-right font-mono">{formatNum(naive.naive_rmse, 4)}</td>
+              <td className="text-right font-mono text-slate-400">{formatNum(naive.naive_rmse, 4)}</td>
+              <td className="text-right font-mono">{formatNum(1, 3)}</td>
+              <td className="text-right font-mono">{formatNum(naive.naive_mae, 4)}</td>
+              <td className="text-right font-mono">{naive.naive_mape === null ? "—" : `${formatNum(naive.naive_mape, 3)}%`}</td>
+              <td className="text-right font-mono">—</td>
+            </tr>
+          )}
         </tbody>
       </table>
     </Panel>

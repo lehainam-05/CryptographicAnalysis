@@ -5,7 +5,8 @@ import { ApiError, describeApiError, fetchExplain, type ExplainResponse, type Mo
 import { formatDate, formatNum, timeframeLabel } from "@/lib/format";
 import { useSymbols } from "@/lib/use-symbols";
 import EChart, { CHART_THEME } from "@/components/echart";
-import { Badge, Field, FilterBar, MetricRow, PageHeader, Panel, StateBox } from "@/components/ui";
+import { Badge, ChartReading, Field, FilterBar, MetricRow, Num, PageHeader, Panel, StateBox } from "@/components/ui";
+import palette from "@/lib/palette";
 
 const MODEL_OPTIONS: { value: ModelName; label: string }[] = [
   { value: "xgboost", label: "XGBoost" },
@@ -81,7 +82,7 @@ export default function ExplainabilityPage() {
 
   const method = data?.method ?? METHOD_OF[modelName];
   const isArima = method === "arima_coefficients";
-  const stateHeight = isArima ? "h-64" : "h-full";
+  const stateHeight = isArima ? "h-64" : "h-[520px]";
 
   return (
     <div className="space-y-6">
@@ -115,10 +116,11 @@ export default function ExplainabilityPage() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_400px]">
         <Panel
-          title={`${isArima ? "Tham số ước lượng" : "Mức độ ảnh hưởng của đặc trưng"} — ${MODEL_LABEL[modelName]} · ${ticker || "…"} (${timeframeLabel(timeframe)})`}
-          actions={<Badge tone="blue">{METHOD_LABEL[method] ?? method}</Badge>}
-          className={isArima ? "self-start" : ""}
-          bodyClassName={isArima ? "p-0" : "h-[520px] p-3"}
+          title={`1. ${isArima ? "Tham số ước lượng" : "Mức ảnh hưởng của từng đặc trưng"} — ${MODEL_LABEL[modelName]} · ${ticker || "…"} (${timeframeLabel(timeframe)})`}
+          subtitle={isArima ? "Ước lượng trên tập train bằng statsmodels, đọc từ artifact MLflow" : "Trung bình |SHAP| trên tập test, sắp từ lớn đến nhỏ"}
+          actions={<Badge tone="slate">{METHOD_LABEL[method] ?? method}</Badge>}
+          className="self-start"
+          bodyClassName={isArima ? "p-0" : "p-3"}
         >
           {loading ? (
             <StateBox kind="loading" message="Đang tải kết quả giải thích…" height={stateHeight} />
@@ -136,7 +138,12 @@ export default function ExplainabilityPage() {
           ) : isArima ? (
             <CoefficientTable data={data} />
           ) : (
-            <FeatureChart bars={toBars(data)} />
+            <>
+              <div className="h-[520px]">
+                <FeatureChart bars={toBars(data)} />
+              </div>
+              <ShapReading bars={toBars(data)} />
+            </>
           )}
         </Panel>
 
@@ -168,7 +175,7 @@ function FeatureChart({ bars }: { bars: Bar[] }) {
       name: axisName,
       nameLocation: "middle",
       nameGap: 26,
-      nameTextStyle: { color: "#94A3B8", fontSize: 11 },
+      nameTextStyle: { color: palette.inkMuted, fontSize: 11 },
       axisLine: CHART_THEME.axisLine,
       axisLabel: CHART_THEME.axisLabel,
       splitLine: CHART_THEME.splitLine,
@@ -178,9 +185,9 @@ function FeatureChart({ bars }: { bars: Bar[] }) {
       {
         name: axisName,
         type: "bar",
-        // A negative RMSE increase means shuffling the feature did not hurt: shown in grey.
-        data: bars.map((b) => ({ value: b.value, itemStyle: { color: b.value < 0 ? "#64748B" : "#3B82F6", borderRadius: [0, 4, 4, 0] } })),
-        label: { show: true, position: "right", color: "#CBD5E1", fontSize: 11, formatter: (p: { value: number }) => Number(p.value).toPrecision(3) },
+        // SHAP is a model output, not market data: Indicator violet (DESIGN.md keeps blue for stocks and controls).
+        data: bars.map((b) => ({ value: b.value, itemStyle: { color: b.value < 0 ? palette.inkMuted : palette.indicator, borderRadius: [0, 4, 4, 0] } })),
+        label: { show: true, position: "right", color: palette.inkSecondary, fontSize: 11, formatter: (p: { value: number }) => Number(p.value).toPrecision(3) },
       },
     ],
   };
@@ -193,7 +200,9 @@ function formatPValue(p: number | null | undefined): string {
 }
 
 function CoefficientTable({ data }: { data: ExplainResponse }) {
+  const note = arimaCancellationNote(data);
   return (
+    <>
     <div className="overflow-x-auto">
       <table className="data-table">
         <thead>
@@ -225,6 +234,12 @@ function CoefficientTable({ data }: { data: ExplainResponse }) {
         </tbody>
       </table>
     </div>
+    {note && (
+      <div className="px-5 pb-4">
+        <ChartReading>{note}</ChartReading>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -239,32 +254,30 @@ function arimaCancellationNote(data: ExplainResponse): string | null {
 
 function SummaryPanel({ data }: { data: ExplainResponse | null }) {
   if (data?.method === "arima_coefficients") {
-    const note = arimaCancellationNote(data);
     return (
-      <Panel title="Tóm tắt mô hình" bodyClassName="flex flex-col gap-2.5 p-4">
+      <Panel title="2. Tóm tắt mô hình" bodyClassName="flex flex-col gap-2.5 p-4">
         <MetricRow label="Bậc (p, d, q)" value={data.order ? `(${data.order.join(", ")})` : "—"} />
         <MetricRow label="Số quan sát lịch sử" value={data.n_observations?.toLocaleString("vi-VN") ?? "—"} />
-        {note && <p className="text-xs leading-relaxed text-slate-300">{note}</p>}
-        <p className="text-[11px] text-slate-500">Artifact tạo lúc {formatDate(data.generated_at, true)}</p>
+        <p className="text-xs text-slate-400">Artifact tạo lúc {formatDate(data.generated_at, true)}</p>
       </Panel>
     );
   }
   const top = data ? [...toBars(data)].reverse().slice(0, 5) : [];
   return (
-    <Panel title="Đặc trưng ảnh hưởng lớn nhất" bodyClassName="flex flex-col gap-2.5 p-4">
+    <Panel title="2. Năm đặc trưng ảnh hưởng lớn nhất" subtitle="Trung bình |SHAP|, cùng đơn vị với giá" bodyClassName="flex flex-col gap-2.5 p-4">
       {top.length === 0 ? (
         <p className="text-sm text-slate-400">Chưa có dữ liệu.</p>
       ) : (
         top.map((f, i) => <MetricRow key={f.name} label={`${i + 1}. ${f.name}`} value={f.value.toPrecision(4)} />)
       )}
-      {data && <p className="text-[11px] text-slate-500">Artifact tạo lúc {formatDate(data.generated_at, true)}</p>}
+      {data && <p className="text-xs text-slate-400">Artifact tạo lúc {formatDate(data.generated_at, true)}</p>}
     </Panel>
   );
 }
 
 function GuidePanel({ method }: { method: string }) {
   return (
-    <Panel title="Cách đọc kết quả" bodyClassName="space-y-2 p-4 text-sm leading-relaxed text-slate-300">
+    <Panel title="3. Cách đọc kết quả" bodyClassName="space-y-2 p-4 text-sm leading-relaxed text-slate-300">
       {method === "arima_coefficients" ? (
         <>
           <p>ARIMA chỉ dùng chuỗi giá đóng cửa nên không có đặc trưng để xếp hạng. Phần giải thích là các tham số ước lượng trên tập huấn luyện; d = 1 nghĩa là mô hình dự báo phần thay đổi giá (sai phân) thay vì mức giá.</p>
@@ -277,5 +290,24 @@ function GuidePanel({ method }: { method: string }) {
         </>
       )}
     </Panel>
+  );
+}
+
+/** Share of the total mean |SHAP| held by the top three features, and by the price-level features. */
+function ShapReading({ bars }: { bars: Bar[] }) {
+  const positive = bars.filter((b) => b.value > 0);
+  const total = positive.reduce((sum, b) => sum + b.value, 0);
+  if (total === 0) return null;
+  const top = [...positive].sort((a, b) => b.value - a.value).slice(0, 3);
+  const topShare = (top.reduce((sum, b) => sum + b.value, 0) / total) * 100;
+  // Features that carry the price level itself: lags, rolling means and rolling min/max.
+  const isPriceLevel = (name: string) => /^(close_lag_|rolling_mean_|rolling_min_|rolling_max_)/.test(name);
+  const levelShare = (positive.filter((b) => isPriceLevel(b.name)).reduce((sum, b) => sum + b.value, 0) / total) * 100;
+  return (
+    <ChartReading>
+      Ba đặc trưng đứng đầu ({top.map((b) => b.name).join(", ")}) chiếm <Num>{formatNum(topShare, 1)}%</Num> tổng ảnh hưởng; nhóm đặc trưng mức giá (giá trễ, trung bình,
+      min/max trượt) chiếm <Num>{formatNum(levelShare, 1)}%</Num>.
+      {levelShare > 50 ? " Mô hình chủ yếu bám mức giá gần nhất, giống cách Naive làm." : " Các đặc trưng động lượng và biến động cũng góp phần đáng kể."}
+    </ChartReading>
   );
 }

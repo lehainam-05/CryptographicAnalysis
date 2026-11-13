@@ -3,27 +3,30 @@
 import EChart, { CHART_THEME } from "@/components/echart";
 import type { IndicatorPoint } from "@/lib/api";
 import { formatAxisTime } from "@/lib/format";
+import palette from "@/lib/palette";
 
 /**
  * Four stacked panes sharing one time axis and one zoom:
  * 1) candlesticks + SMA 20/50, 2) volume, 3) RSI 14 with 30/70 bands,
  * 4) MACD line, signal line and histogram.
+ * Indicator colours (DESIGN.md): the fast line is Indicator violet, the slow line
+ * is slate; blue stays for controls and amber stays for forecasts.
  */
 export default function AnalysisChart({ points, timeframe }: { points: IndicatorPoint[]; timeframe: string }) {
   const labels = points.map((p) => formatAxisTime(p.ts, timeframe));
   const candles = points.map((p) => [p.open, p.close, p.low, p.high]);
   const volumes = points.map((p) => ({
     value: p.volume,
-    itemStyle: { color: p.close >= p.open ? "rgba(16,185,129,0.55)" : "rgba(244,63,94,0.55)" },
+    itemStyle: { color: `${p.close >= p.open ? palette.up : palette.down}8C` },
   }));
   const hist = points.map((p) => ({
     value: p.macd_hist,
-    itemStyle: { color: (p.macd_hist ?? 0) >= 0 ? "#10B981" : "#F43F5E" },
+    itemStyle: { color: (p.macd_hist ?? 0) >= 0 ? palette.up : palette.down },
   }));
 
-  // Pane layout (percent of height): price 0–46, volume 50–60, RSI 65–78, MACD 83–94.
+  // Pane layout (percent of height): price 9–46 (legend and axis name above it), volume 50–60, RSI 65–78, MACD 83–94.
   const grids = [
-    { left: 64, right: 24, top: "4%", height: "42%" },
+    { left: 64, right: 24, top: "9%", height: "37%" },
     { left: 64, right: 24, top: "50%", height: "10%" },
     { left: 64, right: 24, top: "65%", height: "13%" },
     { left: 64, right: 24, top: "83%", height: "11%" },
@@ -42,7 +45,7 @@ export default function AnalysisChart({ points, timeframe }: { points: Indicator
     gridIndex,
     scale: true,
     name,
-    nameTextStyle: { color: "#94A3B8", fontSize: 11, align: "left" },
+    nameTextStyle: { color: palette.inkMuted, fontSize: 11, align: "left" },
     splitNumber: 2,
     axisLine: CHART_THEME.axisLine,
     axisLabel: CHART_THEME.axisLabel,
@@ -54,9 +57,14 @@ export default function AnalysisChart({ points, timeframe }: { points: Indicator
     backgroundColor: "transparent",
     animation: false,
     legend: {
+      type: "scroll",
       top: 0,
+      left: 64,
       right: 24,
-      textStyle: { color: "#CBD5E1", fontSize: 11 },
+      textStyle: { color: palette.inkSecondary, fontSize: 11 },
+      pageIconColor: palette.inkSecondary,
+      pageIconInactiveColor: palette.line,
+      pageTextStyle: { color: palette.inkMuted },
       data: ["Nến OHLC", "SMA 20", "SMA 50", "RSI 14", "MACD", "Signal"],
     },
     tooltip: { trigger: "axis", axisPointer: { type: "cross" }, ...CHART_THEME.tooltip },
@@ -71,31 +79,31 @@ export default function AnalysisChart({ points, timeframe }: { points: Indicator
     ],
     dataZoom: [
       { type: "inside", xAxisIndex: [0, 1, 2, 3], start: 40, end: 100 },
-      { type: "slider", xAxisIndex: [0, 1, 2, 3], start: 40, end: 100, bottom: 0, height: 18, borderColor: "#475569", textStyle: { color: "#94A3B8" } },
+      { type: "slider", xAxisIndex: [0, 1, 2, 3], start: 40, end: 100, bottom: 0, height: 18, borderColor: palette.line, textStyle: { color: palette.inkMuted } },
     ],
     series: [
       {
         name: "Nến OHLC",
         type: "candlestick",
         data: candles,
-        itemStyle: { color: "#10B981", color0: "#F43F5E", borderColor: "#10B981", borderColor0: "#F43F5E" },
+        itemStyle: { color: palette.up, color0: palette.down, borderColor: palette.up, borderColor0: palette.down },
       },
-      line("SMA 20", points.map((p) => p.sma_20), "#3B82F6", 0),
-      line("SMA 50", points.map((p) => p.sma_50), "#F59E0B", 0),
+      line("SMA 20", points.map((p) => p.sma_20), palette.indicator, 0),
+      line("SMA 50", points.map((p) => p.sma_50), palette.inkSecondary, 0),
       { name: "Khối lượng", type: "bar", xAxisIndex: 1, yAxisIndex: 1, data: volumes },
       {
-        ...line("RSI 14", points.map((p) => p.rsi_14), "#A78BFA", 2),
+        ...line("RSI 14", points.map((p) => p.rsi_14), palette.indicator, 2),
         markLine: {
           silent: true,
           symbol: "none",
-          label: { color: "#94A3B8", fontSize: 10 },
-          lineStyle: { color: "#64748B", type: "dashed" },
+          label: { color: palette.inkMuted, fontSize: 10 },
+          lineStyle: { color: palette.inkMuted, type: "dashed" },
           data: [{ yAxis: 70 }, { yAxis: 30 }],
         },
       },
       { name: "Histogram", type: "bar", xAxisIndex: 3, yAxisIndex: 3, data: hist },
-      line("MACD", points.map((p) => p.macd), "#3B82F6", 3),
-      line("Signal", points.map((p) => p.macd_signal), "#F59E0B", 3),
+      line("MACD", points.map((p) => p.macd), palette.indicator, 3),
+      line("Signal", points.map((p) => p.macd_signal), palette.inkSecondary, 3),
     ],
   };
 

@@ -82,10 +82,10 @@ export function StateBox({
   const Icon = kind === "loading" ? Loader2 : kind === "error" ? AlertCircle : Inbox;
   const color = kind === "error" ? "text-down" : kind === "loading" ? "text-accentSoft" : "text-slate-500";
   return (
-    <div className={`flex ${height} w-full flex-col items-center justify-center gap-2 px-6 text-center`}>
-      <Icon className={`h-7 w-7 ${color} ${kind === "loading" ? "animate-spin" : ""}`} />
+    <div role={kind === "error" ? "alert" : "status"} className={`flex ${height} w-full flex-col items-center justify-center gap-2 px-6 text-center`}>
+      <Icon className={`h-7 w-7 ${color} ${kind === "loading" ? "animate-spin" : ""}`} aria-hidden />
       <span className={`text-sm ${kind === "error" ? "font-semibold text-down" : "text-slate-300"}`}>{message}</span>
-      {hint && <span className="max-w-lg text-xs text-slate-500">{hint}</span>}
+      {hint && <span className="max-w-lg text-xs text-slate-400">{hint}</span>}
       {onRetry && (
         <button onClick={onRetry} className="btn-secondary mt-1">
           <RotateCw className="h-3.5 w-3.5" /> Thử lại
@@ -96,14 +96,15 @@ export function StateBox({
 }
 
 /** Colored pill. */
-export function Badge({ tone, children }: { tone: "blue" | "green" | "red" | "amber" | "slate" | "purple"; children: ReactNode }) {
+export function Badge({ tone, children }: { tone: "blue" | "green" | "red" | "amber" | "slate" | "stock" | "crypto"; children: ReactNode }) {
   const tones: Record<string, string> = {
     blue: "border-accentSoft/40 bg-accentSoft/10 text-blue-300",
     green: "border-up/40 bg-up/10 text-emerald-300",
     red: "border-down/40 bg-down/10 text-rose-300",
     amber: "border-forecast/40 bg-forecast/10 text-amber-300",
     slate: "border-line bg-page text-slate-300",
-    purple: "border-purple-400/40 bg-purple-400/10 text-purple-300",
+    stock: "border-stock/40 bg-stock/10 text-blue-300",
+    crypto: "border-crypto/40 bg-crypto/10 text-amber-200",
   };
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${tones[tone]}`}>{children}</span>;
 }
@@ -130,14 +131,24 @@ export function MetricRow({ label, value, note }: { label: string; value: ReactN
     <div className="metric-box">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm text-slate-300">{label}</span>
-        <span className="font-mono text-sm font-semibold text-white">{value}</span>
+        <span className="font-mono text-sm font-semibold tabular-nums text-white">{value}</span>
       </div>
       {note && <div className="mt-1 text-xs text-slate-400">{note}</div>}
     </div>
   );
 }
 
+/** One-line plain-Vietnamese reading printed under a chart (DESIGN.md: a note under every chart). */
+export function ChartReading({ children }: { children: ReactNode }) {
+  return <p className="mt-3 border-t border-line pt-3 text-sm leading-relaxed text-slate-300">{children}</p>;
+}
+
+/** A measured value inside prose: monospace, full ink. */
+export function Num({ children }: { children: ReactNode }) {
+  return <span className="font-mono text-white">{children}</span>;
+}
+
 /** Asset class pill. */
 export function AssetBadge({ assetClass }: { assetClass: string }) {
-  return assetClass === "crypto" ? <Badge tone="purple">Crypto</Badge> : <Badge tone="blue">Cổ phiếu VN</Badge>;
+  return assetClass === "crypto" ? <Badge tone="crypto">Crypto</Badge> : <Badge tone="stock">Cổ phiếu VN</Badge>;
 }

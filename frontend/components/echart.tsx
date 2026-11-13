@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import palette from "@/lib/palette";
 
 /**
  * ECharts renders into a canvas that only exists in the browser, so the
@@ -15,12 +16,12 @@ export default EChart;
 
 /** Shared axis/tooltip styling matching the slate palette. */
 export const CHART_THEME = {
-  axisLine: { lineStyle: { color: "#475569" } },
-  axisLabel: { color: "#94A3B8", fontSize: 11 },
-  splitLine: { lineStyle: { color: "#334155", type: "dashed" as const } },
+  axisLine: { lineStyle: { color: palette.line } },
+  axisLabel: { color: palette.inkMuted, fontSize: 11 },
+  splitLine: { lineStyle: { color: palette.grid, type: "dashed" as const } },
   tooltip: {
-    backgroundColor: "#0F172A",
-    borderColor: "#475569",
-    textStyle: { color: "#E2E8F0", fontSize: 12 },
+    backgroundColor: palette.page,
+    borderColor: palette.line,
+    textStyle: { color: palette.ink, fontSize: 12 },
   },
 };

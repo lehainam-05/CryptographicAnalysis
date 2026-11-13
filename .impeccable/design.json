@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-12T00:00:00Z",
+  "title": "Design System: Tiền số & Cổ phiếu",
+  "extensions": {
+    "colorMeta": {
+      "page": { "role": "neutral", "displayName": "Night Slate", "tonalRamp": ["#020617", "#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1"] },
+      "panel": { "role": "neutral", "displayName": "Panel Slate" },
+      "inset": { "role": "neutral", "displayName": "Ink Well" },
+      "line": { "role": "neutral", "displayName": "Graphite Rule" },
+      "ink": { "role": "neutral", "displayName": "Chalk" },
+      "ink-secondary": { "role": "neutral", "displayName": "Slate Mist" },
+      "ink-muted": { "role": "neutral", "displayName": "Fog" },
+      "accent": { "role": "primary", "displayName": "Signal Blue", "tonalRamp": ["#172554", "#1E3A8A", "#1E40AF", "#1D4ED8", "#2563EB", "#3B82F6", "#60A5FA", "#BFDBFE"] },
+      "accent-hover": { "role": "primary", "displayName": "Deep Signal Blue" },
+      "accent-soft": { "role": "primary", "displayName": "Soft Signal Blue" },
+      "market-stock": { "role": "data", "displayName": "Stock Blue" },
+      "market-crypto": { "role": "data", "displayName": "Copper Crypto", "tonalRamp": ["#451A03", "#78350F", "#92400E", "#B45309", "#D97706", "#F59E0B", "#FBBF24", "#FDE68A"] },
+      "forecast": { "role": "data", "displayName": "Forecast Amber" },
+      "up": { "role": "data", "displayName": "Gain Green", "tonalRamp": ["#022C22", "#064E3B", "#065F46", "#047857", "#059669", "#10B981", "#34D399", "#A7F3D0"] },
+      "down": { "role": "data", "displayName": "Loss Rose", "tonalRamp": ["#4C0519", "#881337", "#9F1239", "#BE123C", "#E11D48", "#F43F5E", "#FB7185", "#FECDD3"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Page title, one per page." },
+      "title": { "displayName": "Title", "purpose": "Numbered panel titles." },
+      "stat": { "displayName": "Stat", "purpose": "Headline numbers on overview stat cards." },
+      "body": { "displayName": "Body", "purpose": "Descriptions and chart readings, ~75ch." },
+      "label": { "displayName": "Label", "purpose": "Uppercase table headers and stat-card labels." },
+      "numeric": { "displayName": "Numeric", "purpose": "Every measured value, with its unit." }
+    },
+    "shadows": [
+      { "name": "metric-lift", "value": "0 5px 20px rgba(0,0,0,0.25)", "purpose": "Metric rows inside panels; the only shadow in the system." }
+    ],
+    "motion": [
+      { "name": "state-change", "value": "300ms ease", "purpose": "Colour, border and underline transitions on hover/active." },
+      { "name": "button-lift", "value": "translateY(-2px) over 300ms", "purpose": "Primary button hover." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action on a page, e.g. 'Tiến hành dự báo'.",
+      "html": "<button class=\"ds-btn-primary\">Tiến hành dự báo</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; height: 42px; padding: 0 20px; border: none; border-radius: 4px; background: #2563EB; color: #fff; font: 600 14px Inter, Arial, sans-serif; cursor: pointer; transition: background 0.3s, transform 0.3s; } .ds-btn-primary:hover { background: #1E40AF; transform: translateY(-2px); } .ds-btn-primary:focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Low-emphasis action such as 'Thử lại'.",
+      "html": "<button class=\"ds-btn-secondary\">Thử lại</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid #475569; border-radius: 4px; background: #0F172A; color: #CBD5E1; font: 12px Inter, Arial, sans-serif; cursor: pointer; transition: border-color 0.3s, color 0.3s; } .ds-btn-secondary:hover, .ds-btn-secondary:focus-visible { border-color: #3B82F6; color: #fff; outline: none; }"
+    },
+    {
+      "name": "Select Field",
+      "kind": "input",
+      "refersTo": "field-select",
+      "description": "Filter control with its label above.",
+      "html": "<label class=\"ds-field\"><span>Mã</span><select class=\"ds-select\"><option>ACB</option></select></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 8px; min-width: 180px; font: 14px Inter, Arial, sans-serif; color: #CBD5E1; } .ds-select { height: 42px; padding: 0 12px; border: 1px solid #475569; border-radius: 8px; background: #0F172A; color: #fff; font-size: 14px; } .ds-select:hover, .ds-select:focus-visible { border-color: #3B82F6; outline: none; }"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Sticky header with growing blue underline on hover/active.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-link\" data-active=\"true\">Tổng quan</a><a class=\"ds-nav-link\">Khám phá dữ liệu</a></nav>",
+      "css": ".ds-nav { display: flex; gap: 4px; background: #1E293B; border-bottom: 1px solid #475569; padding: 0 20px; } .ds-nav-link { position: relative; padding: 20px 12px; font: 15px Inter, Arial, sans-serif; color: #CBD5E1; text-decoration: none; transition: color 0.3s; } .ds-nav-link::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: #3B82F6; transition: width 0.3s; } .ds-nav-link:hover, .ds-nav-link[data-active='true'] { color: #fff; } .ds-nav-link:hover::after, .ds-nav-link[data-active='true']::after { width: 100%; }"
+    },
+    {
+      "name": "Market Badge",
+      "kind": "chip",
+      "description": "Asset class pill: Stock Blue or Copper Crypto.",
+      "html": "<span class=\"ds-badge ds-badge-stock\">Cổ phiếu VN</span> <span class=\"ds-badge ds-badge-crypto\">Crypto</span>",
+      "css": ".ds-badge { display: inline-flex; padding: 2px 10px; border-radius: 9999px; border: 1px solid; font: 500 12px Inter, Arial, sans-serif; } .ds-badge-stock { border-color: rgba(59,130,246,0.4); background: rgba(59,130,246,0.1); color: #93C5FD; } .ds-badge-crypto { border-color: rgba(217,119,6,0.4); background: rgba(217,119,6,0.1); color: #FCD34D; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Numbered titled container with a method subtitle.",
+      "html": "<section class=\"ds-panel\"><header><h2>1. Phân phối lợi suất ngày</h2><p>Histogram lợi suất · đường đứt: phân phối chuẩn</p></header><div class=\"ds-panel-body\">…</div></section>",
+      "css": ".ds-panel { border: 1px solid #475569; border-radius: 10px; background: #1E293B; font-family: Inter, Arial, sans-serif; } .ds-panel header { padding: 16px 20px; border-bottom: 1px solid #475569; } .ds-panel h2 { margin: 0; font-size: 16px; font-weight: 600; color: #fff; } .ds-panel p { margin: 2px 0 0; font-size: 12px; color: #94A3B8; } .ds-panel-body { padding: 20px; color: #CBD5E1; }"
+    },
+    {
+      "name": "Metric Row",
+      "kind": "custom",
+      "refersTo": "metric-row",
+      "description": "Label left, monospace value right; the building block of side panels.",
+      "html": "<div class=\"ds-metric\"><span>Độ biến động năm</span><b>23,3%</b></div>",
+      "css": ".ds-metric { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #475569; border-radius: 5px; background: #0F172A; box-shadow: 0 5px 20px rgba(0,0,0,0.25); font: 14px Inter, Arial, sans-serif; color: #CBD5E1; transition: border-color 0.3s; } .ds-metric b { font: 600 14px ui-monospace, Menlo, monospace; color: #fff; } .ds-metric:hover { border-color: #3B82F6; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lab Notebook",
+    "overview": "A dark, quiet working surface where data is the only thing that shines. Every panel reads like a page of a lab notebook: a numbered title, a one-line note on what is measured and how, the chart or table, then a short reading of the result. Nothing on screen is decorative; colour, weight and position all carry meaning. The system is dense but calm. Slate layers separate regions instead of shadows, a single blue accent marks interaction, and semantic colours (market identity, rise/fall, forecast) are reserved for data. Typography is one sans family; numbers switch to monospace so columns line up and read as measurements. Refinement keeps this world: tighten consistency, legibility on a projector-free laptop and on a phone, and the \"note under every chart\" habit.",
+    "keyCharacteristics": [
+      "Dark slate layering (page → panel → inset), flat, bordered.",
+      "One interactive accent (blue); data colours never double as UI colours.",
+      "Numbered panel titles with a source/method subtitle.",
+      "Monospace numerals for every measured value.",
+      "Each chart ends with a one-line plain-Vietnamese reading."
+    ],
+    "rules": [
+      { "name": "The One Market, One Colour Rule", "body": "Stock is always Stock Blue and crypto always Copper Crypto, in charts, badges and legends alike. A filter never repaints a series.", "section": "colors" },
+      { "name": "The Accent Is For Hands Rule", "body": "Signal Blue means \"you can act here\". Data that happens to be blue uses Stock Blue in a chart context, never on a control.", "section": "colors" },
+      { "name": "The Measured Number Rule", "body": "Any value computed from data is set in monospace with its unit; prose never carries a bare number without its unit or period.", "section": "typography" },
+      { "name": "The Layer Not Shadow Rule", "body": "New surfaces separate by tone and border, never by adding shadows.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do number panel titles and give each a subtitle naming the method or source.",
+      "Do end every chart panel with a one-line reading of what it shows.",
+      "Do keep Stock Blue (`#3B82F6`) and Copper Crypto (`#D97706`) identical across charts, badges and legends.",
+      "Do draw forecast lines dashed in Forecast Amber (`#F59E0B`) and keep the Naive baseline visible next to any model result.",
+      "Do set measured values in monospace with units."
+    ],
+    "donts": [
+      "Don't use Signal Blue on data or semantic colours on controls.",
+      "Don't add shadows, gradients or glows to separate surfaces.",
+      "Don't rely on colour alone: every multi-series chart has a legend or direct labels.",
+      "Don't introduce a second accent hue or a warm grey into the slate neutrals."
+    ]
+  }
+}
